@@ -1,0 +1,87 @@
+#this is code for Method of characteristics needed for creating a contour plot that can be used for a rocket engine nozzle design
+#All units are in SI units
+import numpy as np
+import matplotlib.pyplot as plt 
+from scipy.optimize import fsolve
+
+#INPUTS (will convert this so that it auto fills from CEA code output/user input later)
+p1 = 6894 #Pascals
+Tc= 3800 #chamber temperature (K)
+F_t = 1000 #design thrust (Newtons)
+M_DOT = 10 #mass flow rate (kg/s)
+ALTITUDE = 0 #design altitude (m)
+R_universal = 8314.15 #gas constant
+avg_mol_weight = 24.45 #the average molecular weight of the flowing mixture throughout the engine
+R = R_universal/avg_mol_weight #specific gas constant the gas mixture 
+gam = 1.22 #specific heat ratio
+
+
+#EXIT PRESSURE where p0 is the atmospheric (ambient) pressure at the design altitude
+if (11000<ALTITUDE) and (ALTITUDE<25000):
+    T = -56.46 #CELSIUS
+    p0 = 1000*(22.65*np.exp(1.73-0.000157*ALTITUDE)) #Pascals, converting from kPa to Pa with *1000 https://www.grc.nasa.gov/www/k-12/airplane/atmosmet.html
+elif ALTITUDE>=25000:
+    T = -131.21 + 0.00299*ALTITUDE #CELSIUS
+    p0 = 1000*(2.488*((T+273.1)/216.6)**(-11.388))
+else:
+    #For altitudes 0 to 11,000 m
+    T = 15.04 - 0.00649*ALTITUDE
+    p0 = 1000*(101.29*((T+273.1)/288.08)**5.256)
+
+#various parameters needed for flow field characteristics
+PR = p0/p1
+PR2 = (p0/p1)**((gam-1)/gam) #this is the other pressure ratio defined as (p0/p1)^((gamma-1)/gamma) and is placed into a variable for ease of input later
+P_t = p1*((2/gam+1)**(gam/(gam-1))) 
+Tt = (2*Tc)/(gam+1) #eqn 3-22 from Rocket Propulsion Elements
+V_t = np.sqrt((2*gam*R*Tc/(gam+1))) #eqn 3-21 from Rocket Propulsion Elements
+V_e = np.sqrt(((2*gam*R*Tc)/(gam-1))*(1-PR2)) #eqn 3-16 from Rocket Propulsion Elements
+
+
+#this is just checking to make sure that eithe mdot or thrust is set (also assuming ideal nozzle expansion)
+if M_DOT == 0:
+    M_DOT = F_t/V_e
+elif F_t == 0:
+    F_t = M_DOT*V_e
+else:
+    print("Set either mass flow rate OR design thrust")
+
+T_e = Tc*PR2
+a_e = np.sqrt(gam*R*T_e) #speed of sound at exit
+M_e = V_e/a_e #the exit mach number
+
+
+#Method of characteristics parameters
+T_r = 0.035 #throat radius (m)
+rtd = 180/np.pi
+dtr = np.pi/180
+
+#prandtl-meyer function
+def nu(M):
+    return rtd*(np.sqrt((gam+1)/(gam-1))*np.arctan(np.sqrt((gam-1)*(M**2-1)/(gam+1)))-np.arctan(np.sqrt(M**2-1)))
+
+#theta max calculations
+theta_max = nu(M_e)/2
+
+delta = (90-theta_max)-np.fix(90-theta_max)
+
+n = theta_max * 2
+
+for m in range(1, int(n) + 1):
+    T(m) == T.append((delta + (m - 1)) * dtr)
+    x_int = [1,1.01*M_e]
+    def function2(M):
+        return T(m) - theta_max(M)
+    M(m) == fsolve(function2,x_int)
+    P(m) == 0 + T_r*np.tan(T(m))
+    RR(m) == -T_r/P(m) #the right-running characteristic line slope
+    LR(m) == tan(T(m)+np.arcsin(1/M(m)))#the left-running characteristic line slope
+    SL(m) == -RR(m) #the reflection of the right-running characteristic line slope
+
+P(1) == []
+length = length(P)
+
+for j in range(1,length):
+    P1 = [0, T_r]
+    P2 = [P(j), 0]
+    plt.plot(P1,P2,'b')
+
