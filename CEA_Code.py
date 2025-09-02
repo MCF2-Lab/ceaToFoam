@@ -11,7 +11,7 @@ mat2 = Oxidizer("O2(L)",temp=90.170,wt_percent=100,mols=None,chemical_compositio
 #default unit for pressure is PSI
 #massf is set to "True" so as to output the mass fractions of the reaction
 #"pip" is the supersonic area ratio, which is the ratio of the exit area to the throat area, comprising the divergent section of the nozzle
-problem = RocketProblem(pressure=300,massf=False,o_f=1.8,pip=20.4)
+problem = RocketProblem(pressure=300,massf=False,o_f=2.51,pip=18.9)
 problem.run_cea(mat1,mat2)
 
 #this ouputs the results of the CEARUN file for the LR-101 engine configuration
