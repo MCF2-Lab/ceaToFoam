@@ -7,7 +7,7 @@ Tc = 3673; %Chamber Temperature (K)
 AvgMolWeight = 24.45;
 g = 1.12; %gamma
 avg_mol_weight = 24.45; %the average molecular weight of the flowing mixture throughout the engine
-r = 8314.51; %universal gas constant
+r = 8314.51; %universal gas constant (J/mol*K)
 R = 340; %specific gas constant of the mixture (calculated from CEA output)
 
 %other parameters
@@ -135,6 +135,7 @@ Y_F = [0 yf];
 plot(X_F,Y_F,'r');
 xw = [0 xw]; %array of points
 yw = [TR yw];
+
 
 
 
