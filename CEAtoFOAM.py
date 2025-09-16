@@ -110,65 +110,8 @@ print(round(float(average_m_inverse_n),2))  # computes and prints the average mo
 GasConstant = 8314.4621 # J/(mol*K)
 meanMolarMass = round(average_m_inverse_n,2)
 
-def extract_chamber_mole_fractions(input_file):
-    """
-    Isolates the MOLE FRACTIONS section and extracts the first column of mole fractions for each species.
-    Returns them in the required string format for q.
-    """
-    section_lines = []
-    collecting = False
-    with open(input_file, 'r') as infile:
-        for line in infile:
-            # More flexible header detection
-            if not collecting and "MOLE" in line.upper():
-                print("MOLE FRACTIONS header found:", repr(line))
-                collecting = True
-                continue
-            if collecting:
-                # Stop at the first empty line after the section starts
-                if line.strip() == "":
-                    break
-                section_lines.append(line)
-    print("Collected section lines:", section_lines)  # Debug print
-
-    # Now process the isolated section
-    species_mole_fractions = {}
-    for line in section_lines:
-        parts = line.strip().split()
-        if len(parts) >= 2:
-            species = parts[0].replace('*', '')
-            try:
-                mole_fraction = float(parts[1])
-                species_mole_fractions[species] = mole_fraction
-            except ValueError:
-                continue
-
-    q_str = ' '.join([f"{sp}:{species_mole_fractions[sp]:.5f}" for sp in species_mole_fractions])
-    return q_str
-
-def extract_mole_fractions_section(input_file, output_file):
-    """
-    Extracts the section from 'MOLE FRACTIONS' to 'THERMODYNAMIC PROPERTIES FITTED TO 20000.K'
-    and writes it to output_file.
-    """
-    collecting = False
-    section_lines = []
-    with open(input_file, 'r') as infile:
-        for line in infile:
-            if not collecting and "MOLE FRACTIONS" in line.upper():
-                collecting = True
-            if collecting:
-                section_lines.append(line)
-                if "THERMODYNAMIC PROPERTIES FITTED TO 20000.K" in line.upper():
-                    break
-    with open(output_file, 'w') as outfile:
-        outfile.writelines(section_lines)
-
-def extract_species_and_chamber_mole_fractions(input_file, output_file):
-    """
-    Extracts only the species name and first column of mole fractions from the MOLE FRACTIONS section.
-    Writes them to output_file, one per line: SPECIES VALUE
-    """
+def extract_species_and_chamber_mole_fractions(input_file, output_file): 
+  
     collecting = False
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
         for line in infile:
@@ -176,7 +119,6 @@ def extract_species_and_chamber_mole_fractions(input_file, output_file):
                 collecting = True
                 continue
             if collecting:
-                # Stop at the end marker
                 if "THERMODYNAMIC PROPERTIES FITTED TO 20000.K" in line.upper():
                     break
                 parts = line.strip().split()
@@ -188,11 +130,8 @@ def extract_species_and_chamber_mole_fractions(input_file, output_file):
                     except ValueError:
                         continue
 
-def format_q_from_file(input_file):
-    """
-    Reads species and mole fractions from input_file and formats them as q = CO:0.34299 CO2:0.12916 ...
-    """
-    q_list = []
+def format_q_from_file(input_file): #formats the mole fractions for each species involved in the reaction into the format that is inputted into the Sutherland coefficient section such that Cantera can read the information
+    q_list = []  
     with open(input_file, 'r') as infile:
         for line in infile:
             parts = line.strip().split()
@@ -201,16 +140,10 @@ def format_q_from_file(input_file):
                 q_list.append(f"{species}:{value}")
     q_str = ' '.join(q_list)
     return f"q = {q_str}"
+    #then formats the "q" string into a format such as this: q = H2:0.11111 O2:0.22222 H2O:0.33333 CO2:0.44444 for example
 
-# Example usage:
-q_new  = extract_chamber_mole_fractions('my_output.out')
-print("q =", q_new)
 
-# Write q to a text file
-with open('chamber_mole_fractions.txt', 'w') as outfile:
-    outfile.write(q_new + '\n')
-
-extract_mole_fractions_section('my_output.out', 'mole_fractions_section.txt')
+extract_species_and_chamber_mole_fractions('my_output.out', 'mole_fractions_section.txt')
 extract_species_and_chamber_mole_fractions('my_output.out', 'chamber_mole_fractions_only.txt')
 
 q_formatted = format_q_from_file('chamber_mole_fractions_only.txt')
