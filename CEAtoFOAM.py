@@ -80,7 +80,7 @@ def extract_m_inverse_n(input_file, output_file):
     m_inverse_n_values = []
     with open(input_file, 'r') as infile:
         for line in infile:
-            if line.strip().startswith("M, (1/n)"):
+            if line.strip().startswith("M, (1/n)"): #locates the lines in the output file that denotes the molecular weight value in that section of the engine
                 # Split the line and take the last three values
                 parts = line.split()
                 # Find the indices of the numeric values (skip 'M,' and '(1/n)')
@@ -100,7 +100,7 @@ def extract_m_inverse_n(input_file, output_file):
 m_inverse_n_list = extract_m_inverse_n('my_output.out', 'M_inverse_n.txt')
 #print("Mixture Molecular Weight  [Chamber, Throat, Nozzle]:", m_inverse_n_list)
 average_m_inverse_n = sum(m_inverse_n_list) / len(m_inverse_n_list)
-print(round(float(average_m_inverse_n),2))  # computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol)
+print(round(float(average_m_inverse_n),2))  # computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol) according to the NASA CEA Analysis manual I
 
 
 # -----------------------------------------------------------------------#
@@ -186,9 +186,8 @@ def cpPolynomials(P1,q_new,mech,tempRange1,tempRange2,step):
 #######################################################################
 mech = 'gri30_highT.yaml'
 
-P1 = Pressure_Input*6894.76; #convert PSI to Pa
-T1 = 3538.04;
-
+P1 = Pressure_Input*6894.76; #convert PSI to Pa for use in the Sutherland coefficient calculation
+T1 = 3538.04; #chamber temperature in Kelvin
 
 Tlow = 200
 Thigh = 6000
@@ -224,16 +223,15 @@ gas.TPX = T1, P1, q
 #######################################################################
 
 
-
-gas = ct.Solution(mech)
+gas = ct.Solution(mech) 
 gas.TPX = T1, P1, q  # <-- FIXED
 
-tempRange1 = [Tlow, Tcommon]
-tempRange2 = [Tcommon, Thigh]
+tempRange1 = [Tlow, Tcommon] #specifies the temperature range for the Openfoam file for the low and common temperature (which is usually a temperature somewhere in between the low and high value )
+tempRange2 = [Tcommon, Thigh] #specifies the common temperature and the high temperature for the openfoam file. For the high temperature, it is likely the best practice to set it +3000K higher than the actual chamber temperature outputted by CEA.
 step = 1
 out = cpPolynomials(P1,q,mech,tempRange1,tempRange2, step)
 
-R = GasConstant/(round(meanMolarMass,2))
+R = GasConstant/(round(meanMolarMass,2)) #finds the specific gas constant for the mixture
 
 Lcof_rev = out[2]/R
 Hcof_rev = out[5]/R
@@ -254,6 +252,7 @@ low_entropy_offset = gas.entropy_mass/R - sLoff
 high_enthalpy_offset = gas.enthalpy_mass/R - hHoff*Tref
 high_entropy_offset = gas.entropy_mass/R - sHoff
 
+#openfoam formatting from the output of the Cantera calculations
 print("    specie")
 print("    {")
 print("        nMoles          1;")
