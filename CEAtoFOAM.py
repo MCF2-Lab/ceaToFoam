@@ -1,9 +1,11 @@
 #wrapper code for CEARUN using Python "CEA-Wrap" library using version 1.7.4 of CEA_Wrap
+import shutil
 import sys
 import numpy as np
 from cantera import *
 import cantera as ct
 from CEA_Wrap import Fuel, Oxidizer, RocketProblem
+import os
 
 #using RP-1 and LOX as Propellants
 #Chemical composition is not defined, thus, the program will use the default CEA values for the specified propellant
@@ -46,8 +48,6 @@ problem.run_cea(mat1, mat2)
 #my_output.out is the output file containing the results of the CEA run
 #my_output.plt outputs the pressure, temperature, and other properties at the chamber, throat, and nozzle
 
-import numpy as np
-
 def extract_rows_in_range(input_file, output_file, start_row, end_row):
     #if you want to run a new propellant combination, you must change the inputs of within the CEA_Code.py file to
     #the specifications of your engine, this file will handle the output from my_output.out and parse it into a format
@@ -69,7 +69,29 @@ def extract_rows_in_range(input_file, output_file, start_row, end_row):
     with open(output_file, 'w') as outfile:
         outfile.writelines(extracted_lines)
 
-import numpy as np
+
+def extract_chamber_temperature(input_file):
+    """
+    Extracts the chamber temperature (first value) from the line containing 'T, K'.
+    Returns it as a float.
+    """
+    with open(input_file, 'r') as infile:
+        for line in infile:
+            if "T, K" in line:
+                parts = line.split()
+                for part in parts:
+                    try:
+                        chamber_temp = float(part)
+                        return chamber_temp
+                    except ValueError:
+                        continue
+    return None  # If not found
+
+# Example usage:
+chamber_temp = extract_chamber_temperature('my_output.out')
+print("Chamber temperature:", chamber_temp)
+
+
 
 
 def extract_m_inverse_n(input_file, output_file):
@@ -100,7 +122,7 @@ def extract_m_inverse_n(input_file, output_file):
 m_inverse_n_list = extract_m_inverse_n('my_output.out', 'M_inverse_n.txt')
 #print("Mixture Molecular Weight  [Chamber, Throat, Nozzle]:", m_inverse_n_list)
 average_m_inverse_n = sum(m_inverse_n_list) / len(m_inverse_n_list)
-print(round(float(average_m_inverse_n),2))  # computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol) according to the NASA CEA Analysis manual I
+print(f"Molecular Weight: {round(float(average_m_inverse_n),2)}")  # computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol) according to the NASA CEA Analysis manual I
 
 
 # -----------------------------------------------------------------------#
@@ -187,7 +209,7 @@ def cpPolynomials(P1,q_new,mech,tempRange1,tempRange2,step):
 mech = 'gri30_highT.yaml'
 
 P1 = Pressure_Input*6894.76; #convert PSI to Pa for use in the Sutherland coefficient calculation
-T1 = 3538.04; #chamber temperature in Kelvin
+T1 = chamber_temp; #chamber temperature in Kelvin
 
 Tlow = 200
 Thigh = 6000
@@ -253,6 +275,474 @@ high_enthalpy_offset = gas.enthalpy_mass/R - hHoff*Tref
 high_entropy_offset = gas.entropy_mass/R - sHoff
 
 #openfoam formatting from the output of the Cantera calculations
+VELOCITY_INPUT = str(input("Enter Initial Velocity in the X-Direction (m/s): "))
+U = "U.txt"
+U_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volVectorField;
+    object      U;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 1 -1 0 0 0 0];
+
+internalField   uniform (XVEL 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type            zeroGradient;
+    }
+
+    freestream
+    {
+        type            zeroGradient;
+    }
+
+    walls
+    {
+        type            noSlip;
+    }
+
+    bottomEmptyFaces
+    {
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+U_text = U_text.replace("XVEL", VELOCITY_INPUT) #replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
+
+U_file = open(U, 'w')
+U_file.write(U_text)
+U_file.close()
+
+
+TEMPERATURE_INPUT = str(T1)
+T = "T.txt"
+T_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 300;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform T_VAL;
+    }
+
+    freestream
+    {
+        type            zeroGradient;
+    }
+
+    walls
+    {
+        type            zeroGradient;
+    }
+
+    bottomEmptyFaces
+    {
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+T_text = T_text.replace("T_VAL", TEMPERATURE_INPUT) #replaces the TVAL in the T file with the user inputted value for the temperature
+
+T_file = open(T, 'w')
+T_file.write(T_text)
+T_file.close()
+
+
+
+
+
+alphat = "alphat.txt"
+alphat_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      alphat;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -1 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+
+    freestream
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+
+    walls
+    {
+        type            compressible::alphatWallFunction;
+        value           uniform 0;
+    }
+
+    bottomEmptyFaces
+    {
+	type		empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
+    }
+
+}
+
+
+// ************************************************************************* //'''
+
+
+alphat_file = open(alphat, 'w')
+alphat_file.write(alphat_text)
+alphat_file.close()
+
+
+
+
+
+epsilon = "epsilon.txt"
+epsilon_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      epsilon;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -3 0 0 0 0];
+
+internalField   uniform 266000;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 266000;
+    }
+
+    freestream
+    {
+        type            calculated;
+        value           uniform 266000;
+    }
+
+    walls
+    {
+        type            epsilonWallFunction;
+        value           uniform 266000;
+    }
+
+    bottomEmptyFaces
+    {
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+epsilon_file = open(epsilon, 'w')
+epsilon_file.write(epsilon_text)
+epsilon_file.close()
+
+
+
+
+k = "k.txt"
+
+k_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      k;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -2 0 0 0 0];
+
+internalField   uniform 1000;
+
+boundaryField
+{
+    inlet
+    {
+        type            fixedValue;
+        value           uniform 1000;
+    }
+
+    outlet
+    {
+        type            inletOutlet;
+        inletValue      uniform 1000;
+        value           uniform 1000;
+    }
+
+    outlet_r
+    {
+        type            inletOutlet;
+        inletValue      uniform 1000;
+        value           uniform 1000;
+    }
+
+	asym1
+    {
+        type            wedge;
+        
+    }
+
+
+    nozzle
+    {
+        type            kqRWallFunction;
+        value           uniform 1000;
+    }
+
+    asym2
+    {
+        type            wedge;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+k_file = open(k, 'w')
+k_file.write(k_text)
+k_file.close()
+
+
+
+nut = "nut.txt"
+
+nut_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2012                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      nut;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 2 -1 0 0 0 0];
+
+internalField   uniform 0;
+
+boundaryField
+{
+    inlet
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+
+    outlet
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+
+    outlet_r
+    {
+        type            calculated;
+        value           uniform 0;
+    }
+	
+	asym1
+    {
+        type            wedge;
+        
+    }
+
+    nozzle
+    {
+        type            nutkWallFunction;
+        value           uniform 0;
+    }
+
+    asym2
+    {
+        type            wedge;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+nut_file = open(nut, 'w')
+nut_file.write(nut_text)
+nut_file.close()
+
+
+pressure = "p.txt"
+ambient_pressure = input("Enter Ambient Pressure (PSI): ")
+ambient_pressure_Pa = str(float(ambient_pressure) * 6894.76)  # Convert PSI to Pa
+
+pressure_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -2 0 0 0 0];
+
+internalField   uniform AMB_PRESSURE;
+
+boundaryField
+{
+   inlet
+    {
+        type            fixedValue;
+        value           uniform P_VAL;
+    }
+
+    freestream
+    {
+        type            waveTransmissive;
+        field           p;
+        psi             thermo:psi;
+        gamma           1.14;
+        fieldInf        AMB_PRESSURE;
+        lInf            1;
+        value           uniform AMB_PRESSURE;
+    }
+	
+
+    walls
+    {
+        type            zeroGradient;
+    }
+
+    bottomEmptyFaces
+    {
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
+    }
+}
+
+
+
+// ************************************************************************* //'''
+
+replacements = {"AMB_PRESSURE": ambient_pressure_Pa,
+                "P_VAL": str(P1)
+}
+for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+    pressure_text = pressure_text.replace(old, new)
+
+pressure_file = open(pressure, 'w')
+pressure_file.write(pressure_text)
+pressure_file.close()
+
+
+
+
 print("    specie")
 print("    {")
 print("        nMoles          1;")
@@ -273,3 +763,477 @@ print("        Ts              170.672;")
 print("    }")
 print("}")
 
+thermophysicalProperties = "thermophysicalProperties.txt"
+
+tpp_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      thermophysicalProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+thermoType
+{
+    type            hePsiThermo;
+    mixture         pureMixture;
+    transport       sutherland;
+    thermo          janaf;
+    equationOfState perfectGas;
+    specie          specie;
+    energy          sensibleInternalEnergy;
+}
+
+mixture
+{
+    specie
+    {
+        nMoles          1;
+        molWeight       MOLECULAR_WEIGHT;
+    }
+    thermodynamics
+    {
+        Tlow            T_LOW;
+        Thigh           T_HIGH;
+        Tcommon         T_COMMON;
+        highCpCoeffs    ( Hcof0 Hcof1 Hcof2 Hcof3 Hcof4  high_enthalpy_offset high_entropy_offset );
+        lowCpCoeffs     ( Lcof0 Lcof1 Lcof2 Lcof3 Lcof4  low_enthalpy_offset low_entropy_offset );
+    }
+    transport
+    {
+        As              1.67212e-06;
+        Ts              170.672;
+    }
+}
+
+
+// ************************************************************************* //'''
+
+replacements_tpp = {"MOLECULAR_WEIGHT": str(meanMolarMass),
+                    "T_LOW": str(Tlow),
+                    "T_HIGH": str(Thigh),
+                    "T_COMMON": str(Tcommon),
+                    "Hcof0": str(Hcof[0]),
+                    "Hcof1": str(Hcof[1]),
+                    "Hcof2": str(Hcof[2]),
+                    "Hcof3": str(Hcof[3]),
+                    "Hcof4": str(Hcof[4]),
+                    "high_enthalpy_offset": str(high_enthalpy_offset),
+                    "high_entropy_offset": str(high_entropy_offset),
+                    "Lcof0": str(Lcof[0]),
+                    "Lcof1": str(Lcof[1]),
+                    "Lcof2": str(Lcof[2]),
+                    "Lcof3": str(Lcof[3]),
+                    "Lcof4": str(Lcof[4]),
+                    "low_enthalpy_offset": str(low_enthalpy_offset),
+                    "low_entropy_offset": str(low_entropy_offset),
+                    "P_VAL": str(P1)
+}
+
+
+
+
+
+for old, new in replacements_tpp.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+    tpp_text = tpp_text.replace(old, new)
+
+thermo_file = open(thermophysicalProperties, 'w')
+thermo_file.write(tpp_text)
+thermo_file.close()
+
+
+turbulenceProperties = "turbulenceProperties.txt"
+
+turbProp_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.1.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      turbulenceProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+simulationType  RAS;
+
+RAS
+{
+    RASModel        kEpsilon;
+
+    turbulence      on;
+
+    printCoeffs     on;
+}
+
+// ************************************************************************* //'''
+
+turbulence_file = open(turbulenceProperties, 'w')
+turbulence_file.write(turbProp_text)
+turbulence_file.close()
+
+
+control_dict = "controlDict.txt"
+
+control_dict_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version   2.0;
+    format    ascii;
+    class     dictionary;
+    object    controlDict;
+}
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     rhoCentralFoam;
+
+startFrom       latestTime;
+
+startTime       0;
+
+stopAt          endTime;
+
+endTime         5.0e-02;
+
+deltaT          2e-06;
+
+writeControl    runTime;
+
+writeInterval   5e-05;
+
+writeFormat     ascii;
+
+writePrecision 6;
+
+writeCompression off;
+
+timeFormat	general;
+
+timePrecision 	6;
+
+runTimeModifiable true;
+
+adjustTimeStep	  yes;
+
+maxCo 		  0.5;
+
+// ************************************************************************* //'''
+
+
+control_dict_file = open(control_dict, 'w')
+control_dict_file.write(control_dict_text)
+control_dict_file.close()
+
+
+
+fv_schemes = "fvSchemes.txt"
+
+fv_schemes_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSchemes;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fluxScheme	Kurganov;
+
+ddtSchemes
+{
+    default         Euler;
+}
+
+gradSchemes
+{
+    default         Gauss linear;
+}
+
+divSchemes
+{
+    default         none;
+    div(tauMC)      Gauss linear;
+    div(phi,U)      Gauss limitedLinearV 1;
+    div(phi,e)      Gauss limitedLinear 1;
+    div(phid,p)     Gauss limitedLinear 1;
+    div(phi,K)      Gauss limitedLinear 1;
+    div(phiv,p)     Gauss limitedLinear 1;
+    div(phi,k)      Gauss upwind;
+    div(phi,epsilon) Gauss upwind;
+    div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+}
+
+laplacianSchemes
+{
+    default         Gauss linear corrected;
+}
+
+interpolationSchemes
+{
+    default         linear;
+    reconstruct(rho) vanAlbada;
+    reconstruct(U)   vanAlbadaV;
+    reconstruct(T)   vanAlbada;
+}
+
+snGradSchemes
+{
+    default         corrected;
+}
+// ************************************************************************* //'''
+
+
+fv_schemes_file = open(fv_schemes, 'w')
+fv_schemes_file.write(fv_schemes_text)
+fv_schemes_file.close()
+
+
+
+fv_solutions = "fvSolution.txt"
+
+fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "(rho|rhoU|rhoE)"
+    {
+        solver          diagonal;
+    }
+
+    U
+    {
+        solver          smoothSolver;
+        smoother        GaussSeidel;
+        nSweeps         2;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+
+    e
+    {
+        $U;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+    relaxationFactors
+    {
+    equations
+    {
+          rho      0.15;
+          rhoU     0.15;
+      rhoE     0.15;
+    }
+    }
+    "(k|epsilon).*"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-08;
+        relTol          0;
+    }
+}
+
+// ************************************************************************* //'''
+
+
+fv_solutions_file = open(fv_solutions, 'w')
+fv_solutions_file.write(fv_solutions_text)
+fv_solutions_file.close()
+
+
+
+fv_solutions = "fvSolution.txt"
+
+fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "(rho|rhoU|rhoE)"
+    {
+        solver          diagonal;
+    }
+
+    U
+    {
+        solver          smoothSolver;
+        smoother        GaussSeidel;
+        nSweeps         2;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+
+    e
+    {
+        $U;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+    relaxationFactors
+    {
+    equations
+    {
+          rho      0.15;
+          rhoU     0.15;
+      rhoE     0.15;
+    }
+    }
+    "(k|epsilon).*"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-08;
+        relTol          0;
+    }
+}
+
+// ************************************************************************* //'''
+
+
+fv_solutions_file = open(fv_solutions, 'w')
+fv_solutions_file.write(fv_solutions_text)
+fv_solutions_file.close()
+
+fv_solutions = "fvSolution.txt"
+
+fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                |
+| \\      /  F ield         | cfMesh: A library for mesh generation          |
+|  \\    /   O peration     |                                                |
+|   \\  /    A nd           | Author: Franjo Juretic                         |
+|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+\*---------------------------------------------------------------------------*/
+
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      fvSolution;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+solvers
+{
+    "(rho|rhoU|rhoE)"
+    {
+        solver          diagonal;
+    }
+
+    U
+    {
+        solver          smoothSolver;
+        smoother        GaussSeidel;
+        nSweeps         2;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+
+    e
+    {
+        $U;
+        tolerance       1e-10;
+        relTol          0.0;
+    }
+    relaxationFactors
+    {
+    equations
+    {
+          rho      0.15;
+          rhoU     0.15;
+      rhoE     0.15;
+    }
+    }
+    "(k|epsilon).*"
+    {
+        solver          smoothSolver;
+        smoother        symGaussSeidel;
+        tolerance       1e-08;
+        relTol          0;
+    }
+}
+
+// ************************************************************************* //'''
+
+
+fv_solutions_file = open(fv_solutions, 'w')
+fv_solutions_file.write(fv_solutions_text)
+fv_solutions_file.close()
+
+
+folder_name = input("Name your OpenFOAM case: ")
+
+# Creating the folder for the OpenFOAM case and placing all files in the correct directory for export
+os.makedirs(folder_name, exist_ok=True)
+os.makedirs(f"{folder_name}/0", exist_ok=True)
+os.makedirs(f"{folder_name}/constant", exist_ok=True)
+os.makedirs(f"{folder_name}/system", exist_ok=True)
+
+# Move files before changing directory
+for filename in ["U.txt", "T.txt", "alphat.txt", "epsilon.txt", "k.txt", "nut.txt", "p.txt"]:
+    shutil.move(filename, os.path.join(folder_name, "0", filename))
+
+for filename in ["thermophysicalProperties.txt", "turbulenceProperties.txt"]:
+    shutil.move(filename, os.path.join(folder_name, "constant", filename))
+
+for filename in ["controlDict.txt", "fvSchemes.txt", "fvSolution.txt"]:
+    shutil.move(filename, os.path.join(folder_name, "system", filename))
+
+os.chdir(folder_name)
