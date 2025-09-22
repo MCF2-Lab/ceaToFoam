@@ -1,18 +1,18 @@
 /*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  2.1.1                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
-    version   2.0;
-    format    ascii;
-    class     dictionary;
-    object    controlDict;
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
 }
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 application     rhoCentralFoam;
@@ -25,26 +25,31 @@ stopAt          endTime;
 
 endTime         5.0e-02;
 
-deltaT          2e-06;
+deltaT          2e-07;
 
 writeControl    runTime;
 
 writeInterval   5e-05;
 
+purgeWrite      0;
+
 writeFormat     ascii;
 
-writePrecision 6;
+writePrecision  6;
 
 writeCompression off;
 
-timeFormat	general;
+timeFormat      general;
 
-timePrecision 	6;
+timePrecision   6;
 
 runTimeModifiable true;
 
-adjustTimeStep	  yes;
+adjustTimeStep  yes;
 
-maxCo 		  0.5;
+maxCo           0.5;
+
+//maxDeltaT       1;
+
 
 // ************************************************************************* //
