@@ -531,7 +531,7 @@ k = "k.txt"
 k_text = '''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2012                                 |
+|  \\    /   O peration     | Version:  v2412                                 |
 |   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -556,36 +556,26 @@ boundaryField
         value           uniform 1000;
     }
 
-    outlet
+    freestream
     {
-        type            inletOutlet;
-        inletValue      uniform 1000;
+        type            calculated;
         value           uniform 1000;
     }
 
-    outlet_r
-    {
-        type            inletOutlet;
-        inletValue      uniform 1000;
-        value           uniform 1000;
-    }
-
-	asym1
-    {
-        type            wedge;
-        
-    }
-
-
-    nozzle
+    walls
     {
         type            kqRWallFunction;
         value           uniform 1000;
     }
 
-    asym2
+    bottomEmptyFaces
     {
-        type            wedge;
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
     }
 }
 
@@ -603,7 +593,7 @@ nut = "nut.txt"
 nut_text = '''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2012                                 |
+|  \\    /   O peration     | Version:  v2412                                 |
 |   \\  /    A nd           | Website:  www.openfoam.com                      |
 |    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
@@ -628,33 +618,26 @@ boundaryField
         value           uniform 0;
     }
 
-    outlet
+    freestream
     {
         type            calculated;
         value           uniform 0;
     }
 
-    outlet_r
-    {
-        type            calculated;
-        value           uniform 0;
-    }
-	
-	asym1
-    {
-        type            wedge;
-        
-    }
-
-    nozzle
+    walls
     {
         type            nutkWallFunction;
         value           uniform 0;
     }
 
-    asym2
+    bottomEmptyFaces
     {
-        type            wedge;
+        type            empty;
+    }
+
+    topEmptyFaces
+    {
+        type            empty;
     }
 }
 
@@ -1226,14 +1209,17 @@ os.makedirs(f"{folder_name}/0", exist_ok=True)
 os.makedirs(f"{folder_name}/constant", exist_ok=True)
 os.makedirs(f"{folder_name}/system", exist_ok=True)
 
-# Move files before changing directory
+# Move files before changing directory, removing .txt extension
 for filename in ["U.txt", "T.txt", "alphat.txt", "epsilon.txt", "k.txt", "nut.txt", "p.txt"]:
-    shutil.move(filename, os.path.join(folder_name, "0", filename))
+    new_name = os.path.splitext(filename)[0]  # Removes .txt
+    shutil.move(filename, os.path.join(folder_name, "0", new_name))
 
 for filename in ["thermophysicalProperties.txt", "turbulenceProperties.txt"]:
-    shutil.move(filename, os.path.join(folder_name, "constant", filename))
+    new_name = os.path.splitext(filename)[0]
+    shutil.move(filename, os.path.join(folder_name, "constant", new_name))
 
 for filename in ["controlDict.txt", "fvSchemes.txt", "fvSolution.txt"]:
-    shutil.move(filename, os.path.join(folder_name, "system", filename))
+    new_name = os.path.splitext(filename)[0]
+    shutil.move(filename, os.path.join(folder_name, "system", new_name))
 
 os.chdir(folder_name)
