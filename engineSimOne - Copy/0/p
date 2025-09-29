@@ -23,7 +23,7 @@ internalField   uniform 101353;
 
 boundaryField
 {
-    freestream
+    outlet
     {
         type            waveTransmissive;
         gamma           1.14;
@@ -35,20 +35,16 @@ boundaryField
     inlet
     {
         type            totalPressure;
-	gamma		1.14;
-	psi		thermo:psi;
+		gamma			1.14;
+		psi				thermo:psi;
         p0           	uniform 3.44738e+06;
-	value		uniform 3.44738e+06;
+		value			uniform 3.44738e+06;
     }
-    walls
+    wall
     {
         type            zeroGradient;
     }
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
