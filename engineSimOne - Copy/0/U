@@ -23,7 +23,7 @@ internalField   uniform (10 0 0);
 
 boundaryField
 {
-    freestream
+    outlet
     {
         type            waveTransmissive;
 	gamma 		1.14;
@@ -33,15 +33,11 @@ boundaryField
     {
         type            zeroGradient;
     }
-    walls
+    wall
     {
         type            noSlip;
     }
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
