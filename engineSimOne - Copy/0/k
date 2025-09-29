@@ -26,25 +26,20 @@ boundaryField
         value           uniform 1000;
     }
 
-    freestream
+    outlet
     {
         type            inletOutlet;
-	inletValue 	uniform 1000;
+	inletValue 			uniform 1000;
         value           uniform 1000;
     }
 
-    walls
+    wall
     {
         type            kqRWallFunction;
         value           uniform 1000;
     }
 
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
