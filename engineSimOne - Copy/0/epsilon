@@ -25,25 +25,20 @@ boundaryField
         value           uniform 266000;
     }
 
-    freestream
+    outlet
     {
         type            inletOutlet;
 	inletValue 	uniform 266000;
         value           uniform 266000;
     }
 
-    walls
+    wall
     {
         type            epsilonWallFunction;
         value           uniform 266000;
     }
 
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
