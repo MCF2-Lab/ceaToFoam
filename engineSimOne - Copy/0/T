@@ -21,7 +21,7 @@ dimensions      [0 0 0 1 0 0 0];
 internalField   uniform 300;
 boundaryField
 {
-    freestream
+    outlet
     {
         type            waveTransmissive;
         gamma           1.14;
@@ -36,15 +36,11 @@ boundaryField
         T0           uniform 3538.04;
 	value	     uniform 3538.04;
     }
-    walls
+    wall
     {
         type            zeroGradient;
     }
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
