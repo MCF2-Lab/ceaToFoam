@@ -69,7 +69,7 @@ def extract_rows_in_range(input_file, output_file, start_row, end_row):
     with open(output_file, 'w') as outfile:
         outfile.writelines(extracted_lines)
 
-
+#this function extracts the chamber temperature from the output file
 def extract_chamber_temperature(input_file):
     """
     Extracts the chamber temperature (first value) from the line containing 'T, K'.
@@ -85,14 +85,36 @@ def extract_chamber_temperature(input_file):
                         return chamber_temp
                     except ValueError:
                         continue
-    return None  # If not found
+    #returns nothing if the chamber temperature is not found
+    return None 
 
-# Example usage:
 chamber_temp = extract_chamber_temperature('my_output.out')
 print("Chamber temperature:", chamber_temp)
 
 
+def extract_gammas(input_file):
+    """
+    Extracts the chamber temperature (first value) from the line containing 'GAMMAs'.
+    Returns it as a float.
+    """
+    with open(input_file, 'r') as infile:
+        for line in infile:
+            if "GAMMAs" in line:
+                parts = line.split()
+                for part in parts:
+                    try:
+                        gamma = float(part)
+                        return gamma
+                    except ValueError:
+                        continue
+    #returns nothing if the chamber temperature is not found
+    return None 
 
+chamber_temp = extract_chamber_temperature('my_output.out')
+print("Chamber temperature:", chamber_temp)
+
+gammas = extract_gammas('my_output.out')
+print("Gammas:", gammas)
 
 def extract_m_inverse_n(input_file, output_file):
     """
@@ -102,27 +124,31 @@ def extract_m_inverse_n(input_file, output_file):
     m_inverse_n_values = []
     with open(input_file, 'r') as infile:
         for line in infile:
-            if line.strip().startswith("M, (1/n)"): #locates the lines in the output file that denotes the molecular weight value in that section of the engine
+            #locates the lines in the output file that denotes the molecular weight value in that section of the engine
+            if line.strip().startswith("M, (1/n)"):
                 # Split the line and take the last three values
                 parts = line.split()
-                # Find the indices of the numeric values (skip 'M,' and '(1/n)')
+                # Finds the indices of the numeric values (skip 'M,' and '(1/n)')
                 numeric_parts = [p for p in parts if p.replace('.', '', 1).isdigit()]
                 # Convert to float and take the first three
                 m_inverse_n_values = [float(numeric_parts[i]) for i in range(3)]
                 break
 
-    # Write to output file
+    # Writes to an output file
     with open(output_file, 'w') as outfile:
         for value in m_inverse_n_values:
             outfile.write(f"{value}\n")
 
     return m_inverse_n_values
 
-# Example usage:
+
 m_inverse_n_list = extract_m_inverse_n('my_output.out', 'M_inverse_n.txt')
+
 #print("Mixture Molecular Weight  [Chamber, Throat, Nozzle]:", m_inverse_n_list)
 average_m_inverse_n = sum(m_inverse_n_list) / len(m_inverse_n_list)
-print(f"Molecular Weight: {round(float(average_m_inverse_n),2)}")  # computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol) according to the NASA CEA Analysis manual I
+
+# computes and prints the average molecular weight in kg/kmol (g/mol = kg/kmol) according to NASA CEA Analysis manual I
+print(f"Molecular Weight: {round(float(average_m_inverse_n),2)}")  
 
 
 # -----------------------------------------------------------------------#
@@ -151,8 +177,8 @@ def extract_species_and_chamber_mole_fractions(input_file, output_file):
                         outfile.write(f"{species} {mole_fraction:.5f}\n")
                     except ValueError:
                         continue
-
-def format_q_from_file(input_file): #formats the mole fractions for each species involved in the reaction into the format that is inputted into the Sutherland coefficient section such that Cantera can read the information
+#formats the mole fractions for each species involved in the reaction into the format that is inputted into the Sutherland coefficient section such that Cantera can read the information
+def format_q_from_file(input_file):
     q_list = []  
     with open(input_file, 'r') as infile:
         for line in infile:
@@ -161,9 +187,8 @@ def format_q_from_file(input_file): #formats the mole fractions for each species
                 species, value = parts
                 q_list.append(f"{species}:{value}")
     q_str = ' '.join(q_list)
+     #then formats the "q" string into a format such as this: q = H2:0.11111 O2:0.22222 H2O:0.33333 CO2:0.44444 for example
     return f"q = {q_str}"
-    #then formats the "q" string into a format such as this: q = H2:0.11111 O2:0.22222 H2O:0.33333 CO2:0.44444 for example
-
 
 extract_species_and_chamber_mole_fractions('my_output.out', 'mole_fractions_section.txt')
 extract_species_and_chamber_mole_fractions('my_output.out', 'chamber_mole_fractions_only.txt')
@@ -184,7 +209,8 @@ def cpPolynomials(P1,q_new,mech,tempRange1,tempRange2,step):
     cp1 = []
         
     for i in range(a,b,step):
-        gas.TPX = i, P1, q  # <-- FIXED
+        #these are fixed values
+        gas.TPX = i, P1, q
         cp1.append(gas.cp_mass)
 
     CpPoly1 = np.polyfit(Tv1, cp1, 4)
@@ -196,7 +222,7 @@ def cpPolynomials(P1,q_new,mech,tempRange1,tempRange2,step):
     cp2 = []
         
     for i in range(c,d,step):
-        gas.TPX = i, P1, q  # <-- FIXED
+        gas.TPX = i, P1, q
         cp2.append(gas.cp_mass)
 
     CpPoly2 = np.polyfit(Tv2, cp2, 4)
@@ -208,15 +234,20 @@ def cpPolynomials(P1,q_new,mech,tempRange1,tempRange2,step):
 #######################################################################
 mech = 'gri30_highT.yaml'
 
-P1 = Pressure_Input*6894.76; #convert PSI to Pa for use in the Sutherland coefficient calculation
-T1 = chamber_temp; #chamber temperature in Kelvin
+ #convert PSI to Pa for use in the Sutherland coefficient calculation
+P1 = Pressure_Input*6894.76;
+ #chamber temperature in Kelvin
+T1 = chamber_temp
+gamma = gammas
 
+#these are the Tlow and Thigh values for the OpenFOAM thermophysicalProperties file also coinciding with the Sutherland gri30_highT.yaml file temperature value ranges
 Tlow = 200
-Thigh = 6000
+Thigh = 6000 
 Tcommon = 1000
 Tref = 298.15
 
-q = q_formatted.replace("q = ", "").strip()  # Removes 'q = ' and any leading/trailing spaces
+# Removes 'q = ' and any leading/trailing spaces
+q = q_formatted.replace("q = ", "").strip()  
 print(q)
 
 gas = ct.Solution('gri30_highT.yaml')
@@ -248,12 +279,16 @@ gas.TPX = T1, P1, q
 gas = ct.Solution(mech) 
 gas.TPX = T1, P1, q  # <-- FIXED
 
-tempRange1 = [Tlow, Tcommon] #specifies the temperature range for the Openfoam file for the low and common temperature (which is usually a temperature somewhere in between the low and high value )
-tempRange2 = [Tcommon, Thigh] #specifies the common temperature and the high temperature for the openfoam file. For the high temperature, it is likely the best practice to set it +3000K higher than the actual chamber temperature outputted by CEA.
+#specifies the temperature range for the Openfoam file for the low and common temperature (which is usually a temperature somewhere in between the low and high value )
+tempRange1 = [Tlow, Tcommon] 
+
+ #specifies the common temperature and the high temperature for the openfoam file. For the high temperature, it is likely the best practice to set it +3000K higher than the actual chamber temperature outputted by CEA.
+tempRange2 = [Tcommon, Thigh] 
 step = 1
 out = cpPolynomials(P1,q,mech,tempRange1,tempRange2, step)
 
-R = GasConstant/(round(meanMolarMass,2)) #finds the specific gas constant for the mixture
+#finds the specific gas constant for the mixture
+R = GasConstant/(round(meanMolarMass,2)) 
 
 Lcof_rev = out[2]/R
 Hcof_rev = out[5]/R
@@ -274,8 +309,12 @@ low_entropy_offset = gas.entropy_mass/R - sLoff
 high_enthalpy_offset = gas.enthalpy_mass/R - hHoff*Tref
 high_entropy_offset = gas.entropy_mass/R - sHoff
 
-#openfoam formatting from the output of the Cantera calculations
-VELOCITY_INPUT = str(input("Enter Initial Velocity in the X-Direction (m/s): "))
+#the following section is the generation of all necessary files required for an OpenFOAM simulation of your engine according to the prescribed thermophysical properties previously inputted
+
+a_sound = np.sqrt(gas.cp_mass*R* T1)
+
+#Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
+VELOCITY_INPUT = 0.1*a_sound
 U = "U.txt"
 U_text = '''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
@@ -337,6 +376,7 @@ U_file.close()
 
 TEMPERATURE_INPUT = str(T1)
 T = "T.txt"
+GAMMA_INPUT = str(gamma)
 T_text = '''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -348,7 +388,9 @@ FoamFile
 {
     version     2.0;
     format      ascii;
+    arch        "LSB;label=32;scalar=64";
     class       volScalarField;
+    location    "0";
     object      T;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -356,31 +398,28 @@ FoamFile
 dimensions      [0 0 0 1 0 0 0];
 
 internalField   uniform 300;
-
 boundaryField
 {
+    outlet
+    {
+        type            waveTransmissive;
+        gamma           GAMMA_VAL;
+        fieldInf        300;
+        lInf            10;
+        value           uniform 300;
+    }
     inlet
     {
-        type            fixedValue;
-        value           uniform T_VAL;
+        type         totalTemperature;
+	    gamma        GAMMA_VAL;
+        T0           uniform 3538.04;
+	    value	     uniform 3538.04;
     }
-
-    freestream
+    wall
     {
         type            zeroGradient;
     }
-
-    walls
-    {
-        type            zeroGradient;
-    }
-
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -390,6 +429,7 @@ boundaryField
 // ************************************************************************* //'''
 
 T_text = T_text.replace("T_VAL", TEMPERATURE_INPUT) #replaces the TVAL in the T file with the user inputted value for the temperature
+T_text = T_text.replace("GAMMA_VAL", GAMMA_INPUT) #replaces the GAMMA_VAL in the T file with the user inputted value for the gamma
 
 T_file = open(T, 'w')
 T_file.write(T_text)
@@ -400,12 +440,12 @@ T_file.close()
 
 
 alphat = "alphat.txt"
-alphat_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2412                                 |
-|   \\  /    A nd           | Website:  www.openfoam.com                      |
-|    \\/     M anipulation  |                                                 |
+alphat_text = '''
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Website:  www.openfoam.com                      |
+|    \/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -428,24 +468,19 @@ boundaryField
         value           uniform 0;
     }
 
-    freestream
+    outlet
     {
         type            calculated;
         value           uniform 0;
     }
 
-    walls
+    wall
     {
         type            compressible::alphatWallFunction;
         value           uniform 0;
     }
 
-    bottomEmptyFaces
-    {
-	type		empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -465,12 +500,12 @@ alphat_file.close()
 
 
 epsilon = "epsilon.txt"
-epsilon_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  v2412                                 |
-|   \\  /    A nd           | Website:  www.openfoam.com                      |
-|    \\/     M anipulation  |                                                 |
+epsilon_text = '''
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Website:  www.openfoam.com                      |
+|    \/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -493,24 +528,20 @@ boundaryField
         value           uniform 266000;
     }
 
-    freestream
+    outlet
     {
-        type            calculated;
+        type            inletOutlet;
+        inletValue      uniform 266000;
         value           uniform 266000;
     }
 
-    walls
+    wall
     {
         type            epsilonWallFunction;
         value           uniform 266000;
     }
 
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -528,7 +559,8 @@ epsilon_file.close()
 
 k = "k.txt"
 
-k_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+k_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -556,24 +588,20 @@ boundaryField
         value           uniform 1000;
     }
 
-    freestream
+    outlet
     {
-        type            calculated;
+        type            inletOutlet;
+	inletValue 			uniform 1000;
         value           uniform 1000;
     }
 
-    walls
+    wall
     {
         type            kqRWallFunction;
         value           uniform 1000;
     }
 
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -590,7 +618,8 @@ k_file.close()
 
 nut = "nut.txt"
 
-nut_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+nut_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -618,24 +647,19 @@ boundaryField
         value           uniform 0;
     }
 
-    freestream
+    outlet
     {
         type            calculated;
         value           uniform 0;
     }
 
-    walls
+    wall
     {
         type            nutkWallFunction;
         value           uniform 0;
     }
 
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -653,7 +677,8 @@ pressure = "p.txt"
 ambient_pressure = input("Enter Ambient Pressure (PSI): ")
 ambient_pressure_Pa = str(float(ambient_pressure) * 6894.76)  # Convert PSI to Pa
 
-pressure_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+pressure_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -664,7 +689,9 @@ FoamFile
 {
     version     2.0;
     format      ascii;
+    arch        "LSB;label=32;scalar=64";
     class       volScalarField;
+    location    "0";
     object      p;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
@@ -673,48 +700,42 @@ dimensions      [1 -1 -2 0 0 0 0];
 
 internalField   uniform AMB_PRESSURE;
 
+
 boundaryField
 {
-   inlet
-    {
-        type            fixedValue;
-        value           uniform P_VAL;
-    }
-
-    freestream
+    outlet
     {
         type            waveTransmissive;
-        field           p;
-        psi             thermo:psi;
-        gamma           1.14;
+        gamma           GAMMA_VAL;
         fieldInf        AMB_PRESSURE;
+        psi             thermo:psi;
         lInf            1;
         value           uniform AMB_PRESSURE;
     }
-	
-
-    walls
+    inlet
+    {
+        type            totalPressure;
+        gamma           GAMMA_VAL;
+        psi             thermo:psi;
+        p0              uniform P_VAL;
+        value           uniform P_VAL;
+    }
+    wall
     {
         type            zeroGradient;
     }
-
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
 }
 
 
-
 // ************************************************************************* //'''
 
 replacements = {"AMB_PRESSURE": ambient_pressure_Pa,
                 "P_VAL": str(P1)
+                ,"GAMMA_VAL": GAMMA_INPUT
 }
 for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
     pressure_text = pressure_text.replace(old, new)
@@ -725,26 +746,6 @@ pressure_file.close()
 
 
 
-
-print("    specie")
-print("    {")
-print("        nMoles          1;")
-print("        molWeight       %s;" % meanMolarMass)
-print("    }")
-print("    thermodynamics")
-print("    {")
-print("        Tlow            %f;" % Tlow)
-print("        Thigh           %f;" % Thigh)
-print("        Tcommon         %f;" % Tcommon)
-print("        highCpCoeffs    ( %g %g %g %g %g %g %g );" % (Hcof[0],  Hcof[1], Hcof[2], Hcof[3], Hcof[4], high_enthalpy_offset,  high_entropy_offset))
-print("        lowCpCoeffs     ( %g %g %g %g %g  %g %g );" % (Lcof[0], Lcof[1], Lcof[2], Lcof[3], Lcof[4],  low_enthalpy_offset, low_entropy_offset))
-print("    }")
-print("    transport")
-print("    {")
-print("        As              1.67212e-06;")
-print("        Ts              170.672;")
-print("    }")
-print("}")
 
 thermophysicalProperties = "thermophysicalProperties.txt"
 
@@ -835,12 +836,12 @@ thermo_file.close()
 
 turbulenceProperties = "turbulenceProperties.txt"
 
-turbProp_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                 |
-| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
-|  \\    /   O peration     | Version:  2.1.1                                 |
-|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |
-|    \\/     M anipulation  |                                                 |
+turbProp_text = '''
+/*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
+| \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \    /   O peration     | Version:  v2412                                 |
+|   \  /    A nd           | Website:  www.openfoam.com                      |
+|    \/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
@@ -871,21 +872,22 @@ turbulence_file.close()
 
 control_dict = "controlDict.txt"
 
-control_dict_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+control_dict_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 FoamFile
 {
-    version   2.0;
-    format    ascii;
-    class     dictionary;
-    object    controlDict;
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
 }
-
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 application     rhoCentralFoam;
@@ -896,29 +898,45 @@ startTime       0;
 
 stopAt          endTime;
 
+functions
+{
+    MachNo
+    {
+        type            MachNo;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    runTime;
+        writeInterval   5e-05;     
+    }
+}
+
 endTime         5.0e-02;
 
-deltaT          2e-06;
+deltaT          2e-07;
 
 writeControl    runTime;
 
 writeInterval   5e-05;
 
+purgeWrite      0;
+
 writeFormat     ascii;
 
-writePrecision 6;
+writePrecision  6;
 
 writeCompression off;
 
-timeFormat	general;
+timeFormat      general;
 
-timePrecision 	6;
+timePrecision   6;
 
 runTimeModifiable true;
 
-adjustTimeStep	  yes;
+adjustTimeStep  yes;
 
-maxCo 		  0.5;
+maxCo           0.5;
+
+//maxDeltaT       1;
+
 
 // ************************************************************************* //'''
 
@@ -931,24 +949,25 @@ control_dict_file.close()
 
 fv_schemes = "fvSchemes.txt"
 
-fv_schemes_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+fv_schemes_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
-
 FoamFile
 {
     version     2.0;
     format      ascii;
     class       dictionary;
+    location    "system";
     object      fvSchemes;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-fluxScheme	Kurganov;
+fluxScheme      Kurganov;
 
 ddtSchemes
 {
@@ -983,14 +1002,16 @@ interpolationSchemes
 {
     default         linear;
     reconstruct(rho) vanAlbada;
-    reconstruct(U)   vanAlbadaV;
-    reconstruct(T)   vanAlbada;
+    reconstruct(U)  vanAlbadaV;
+    reconstruct(T)  vanAlbada;
 }
 
 snGradSchemes
 {
     default         corrected;
 }
+
+
 // ************************************************************************* //'''
 
 
@@ -1002,146 +1023,13 @@ fv_schemes_file.close()
 
 fv_solutions = "fvSolution.txt"
 
-fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
-\*---------------------------------------------------------------------------*/
-
-FoamFile
-{
-    version     2.0;
-    format      ascii;
-    class       dictionary;
-    object      fvSolution;
-}
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-solvers
-{
-    "(rho|rhoU|rhoE)"
-    {
-        solver          diagonal;
-    }
-
-    U
-    {
-        solver          smoothSolver;
-        smoother        GaussSeidel;
-        nSweeps         2;
-        tolerance       1e-10;
-        relTol          0.0;
-    }
-
-    e
-    {
-        $U;
-        tolerance       1e-10;
-        relTol          0.0;
-    }
-    relaxationFactors
-    {
-    equations
-    {
-          rho      0.15;
-          rhoU     0.15;
-      rhoE     0.15;
-    }
-    }
-    "(k|epsilon).*"
-    {
-        solver          smoothSolver;
-        smoother        symGaussSeidel;
-        tolerance       1e-08;
-        relTol          0;
-    }
-}
-
-// ************************************************************************* //'''
-
-
-fv_solutions_file = open(fv_solutions, 'w')
-fv_solutions_file.write(fv_solutions_text)
-fv_solutions_file.close()
-
-
-
-fv_solutions = "fvSolution.txt"
-
-fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
-\*---------------------------------------------------------------------------*/
-
-FoamFile
-{
-    version     2.0;
-    format      ascii;
-    class       dictionary;
-    object      fvSolution;
-}
-// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
-
-solvers
-{
-    "(rho|rhoU|rhoE)"
-    {
-        solver          diagonal;
-    }
-
-    U
-    {
-        solver          smoothSolver;
-        smoother        GaussSeidel;
-        nSweeps         2;
-        tolerance       1e-10;
-        relTol          0.0;
-    }
-
-    e
-    {
-        $U;
-        tolerance       1e-10;
-        relTol          0.0;
-    }
-    relaxationFactors
-    {
-    equations
-    {
-          rho      0.15;
-          rhoU     0.15;
-      rhoE     0.15;
-    }
-    }
-    "(k|epsilon).*"
-    {
-        solver          smoothSolver;
-        smoother        symGaussSeidel;
-        tolerance       1e-08;
-        relTol          0;
-    }
-}
-
-// ************************************************************************* //'''
-
-
-fv_solutions_file = open(fv_solutions, 'w')
-fv_solutions_file.write(fv_solutions_text)
-fv_solutions_file.close()
-
-fv_solutions = "fvSolution.txt"
-
-fv_solutions_text = '''/*--------------------------------*- C++ -*----------------------------------*\
-| =========                 |                                                |
-| \\      /  F ield         | cfMesh: A library for mesh generation          |
-|  \\    /   O peration     |                                                |
-|   \\  /    A nd           | Author: Franjo Juretic                         |
-|    \\/     M anipulation  | E-mail: franjo.juretic@c-fields.com            |
+fv_solutions_text = '''
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
 \*---------------------------------------------------------------------------*/
 
 FoamFile
