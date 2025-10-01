@@ -14,6 +14,30 @@ Pressure_Input = float(input("Enter Chamber Pressure (PSI): "))
 Fuel_Input = input("Enter Fuel (RP-1,H2(L),CH4(L)): ")
 Oxidizer_Input = input("Enter Oxidizer (O2(L),N2O4,O2): ")
 OF_Ratio = float(input("Enter O/F Ratio: "))
+Design_altitude = float(input("Enter Design Altitude (ft): "))
+altitude = Design_altitude*0.3048 #converts feet to meters
+
+
+
+
+#AMBIENT PRESSURE CALCULATION SECTION
+
+#----------------------------------------------------------------------------------------#
+if (11000*0.3048<altitude) and (altitude<25000*0.3048):
+    T = -56.46 #CELSIUS
+    p0 = 1000*(22.65*np.exp(1.73-0.000157*altitude)) #Pascals, converting from kPa to Pa with *1000 https://www.grc.nasa.gov/www/k-12/airplane/atmosmet.html
+elif altitude>=25000*0.3048:
+    T = -131.21 + 0.00299*altitude #CELSIUS
+    p0 = 1000*(2.488*((T+273.1)/216.6)**(-11.388)) # the altitude pressure in Pascals
+else:
+    #For altitudes 0 to 11,000 m
+    T = 15.04 - 0.00649*altitude
+    p0 = 1000*(101.29*((T+273.1)/288.08)**5.256)
+#---------------------------------------------------------------------------------------#
+
+
+p0_psi = p0*0.000145038 #converts Pascals to PSI for use in the CEA code
+ambient_pressure = p0_psi
 
 fuel_temps = {
     "RP-1": 298.15,
@@ -40,7 +64,7 @@ mat2 = Oxidizer(str(Oxidizer_Input),temp_oxidizer,wt_percent=100,mols=None,chemi
 #default unit for pressure is PSI
 #massf is set to "True" so as to output the mass fractions of the reaction
 #"pip" is the supersonic area ratio, which is the ratio of the exit area to the throat area, comprising the divergent section of the nozzle
-problem = RocketProblem(pressure=Pressure_Input, massf=False, o_f=OF_Ratio, pip=18.9)
+problem = RocketProblem(pressure=Pressure_Input, massf=False, o_f=OF_Ratio, pip = Pressure_Input/ambient_pressure)
 problem.run_cea(mat1, mat2)
 
 #this ouputs the results of the CEARUN file for the LR-101 engine configuration
@@ -311,7 +335,8 @@ high_entropy_offset = gas.entropy_mass/R - sHoff
 
 #the following section is the generation of all necessary files required for an OpenFOAM simulation of your engine according to the prescribed thermophysical properties previously inputted
 
-a_sound = np.sqrt(gas.cp_mass*R* T1)
+a_sound = np.sqrt(gammas*R* T1)
+print(a_sound)
 
 #Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
 VELOCITY_INPUT = 0.1*a_sound
@@ -367,7 +392,7 @@ boundaryField
 
 // ************************************************************************* //'''
 
-U_text = U_text.replace("XVEL", VELOCITY_INPUT) #replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
+U_text = U_text.replace("XVEL", str(VELOCITY_INPUT)) #replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
 
 U_file = open(U, 'w')
 U_file.write(U_text)
@@ -674,8 +699,7 @@ nut_file.close()
 
 
 pressure = "p.txt"
-ambient_pressure = input("Enter Ambient Pressure (PSI): ")
-ambient_pressure_Pa = str(float(ambient_pressure) * 6894.76)  # Convert PSI to Pa
+ambient_pressure_Pa = str(p0)
 
 pressure_text = '''
 /*--------------------------------*- C++ -*----------------------------------*\
@@ -906,6 +930,14 @@ functions
         libs            ("libfieldFunctionObjects.so");
         writeControl    runTime;
         writeInterval   5e-05;     
+    }
+    wallHeatFlux
+    {
+        type            wallHeatFlux;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    runTime;
+        writeInterval   5e-05;
+        patches        (wall);
     }
 }
 
