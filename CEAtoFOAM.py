@@ -1,6 +1,7 @@
 #wrapper code for CEARUN using Python "CEA-Wrap" library using version 1.7.4 of CEA_Wrap
 import shutil
 import sys
+from matplotlib import pyplot as plt
 import numpy as np
 from cantera import *
 import cantera as ct
@@ -24,15 +25,15 @@ altitude = Design_altitude*0.3048 #converts feet to meters
 
 #----------------------------------------------------------------------------------------#
 if (11000*0.3048<altitude) and (altitude<25000*0.3048):
-    T = -56.46 #CELSIUS
+    Tamb = -56.46 #CELSIUS
     p0 = 1000*(22.65*np.exp(1.73-0.000157*altitude)) #Pascals, converting from kPa to Pa with *1000 https://www.grc.nasa.gov/www/k-12/airplane/atmosmet.html
 elif altitude>=25000*0.3048:
-    T = -131.21 + 0.00299*altitude #CELSIUS
-    p0 = 1000*(2.488*((T+273.1)/216.6)**(-11.388)) # the altitude pressure in Pascals
+    Tamb = -131.21 + 0.00299*altitude #CELSIUS
+    p0 = 1000*(2.488*((Tamb+273.1)/216.6)**(-11.388)) # the altitude pressure in Pascals
 else:
     #For altitudes 0 to 11,000 m
-    T = 15.04 - 0.00649*altitude
-    p0 = 1000*(101.29*((T+273.1)/288.08)**5.256)
+    Tamb = 15.04 - 0.00649*altitude
+    p0 = 1000*(101.29*((Tamb+273.1)/288.08)**5.256)
 #---------------------------------------------------------------------------------------#
 
 
@@ -292,6 +293,7 @@ def format_q_from_file_filtered(input_file, allowed_species):
 # Use the filtered function
 q = format_q_from_file_filtered('chamber_mole_fractions_only.txt', allowed_species)
 
+print(q)
 # Now q only contains valid species for Cantera
 gas.TPX = T1, P1, q
 
@@ -313,6 +315,35 @@ out = cpPolynomials(P1,q,mech,tempRange1,tempRange2, step)
 
 #finds the specific gas constant for the mixture
 R = GasConstant/(round(meanMolarMass,2)) 
+
+
+#this plots the Cp(T) vs Static Temperature (K) curve for the given mixture
+npoints = 50
+temRL = np.linspace(200, 1200, npoints)
+temRH = np.linspace(800, 5200, npoints)
+
+cpL = np.zeros(npoints)
+cpH = np.zeros(npoints)
+
+cpL = np.polyval(out[2], temRL)
+cpH = np.polyval(out[5], temRH)
+
+#For OpenFoam
+cpLbyR = np.zeros(npoints)
+cpHbyR = np.zeros(npoints)
+
+cpLbyR = np.polyval(out[2], temRL)
+cpHbyR = np.polyval(out[5], temRH)
+
+plt.plot(temRL,cpLbyR, lw=2)
+plt.plot(temRH,cpHbyR, lw=2)
+
+plt.xlabel('Temperature (K)')
+plt.ylabel('$C_p$ [J/kg/K]')
+plt.grid(color='b', alpha=0.5, linewidth=0.5)
+
+#plt.savefig("cp_vs_T.png")
+plt.show()
 
 Lcof_rev = out[2]/R
 Hcof_rev = out[5]/R
@@ -400,6 +431,7 @@ U_file.close()
 
 
 TEMPERATURE_INPUT = str(T1)
+TEMPERATURE_AMBIENT = str(Tamb + 273.15) #converts the ambient temperature from Celsius to Kelvin
 T = "T.txt"
 GAMMA_INPUT = str(gamma)
 T_text = '''/*--------------------------------*- C++ -*----------------------------------*\
@@ -422,23 +454,23 @@ FoamFile
 
 dimensions      [0 0 0 1 0 0 0];
 
-internalField   uniform 300;
+internalField   uniform T_AMBIENT;
 boundaryField
 {
     outlet
     {
         type            waveTransmissive;
         gamma           GAMMA_VAL;
-        fieldInf        300;
+        fieldInf        T_AMBIENT;
         lInf            10;
-        value           uniform 300;
+        value           uniform T_AMBIENT;
     }
     inlet
     {
         type         totalTemperature;
 	    gamma        GAMMA_VAL;
-        T0           uniform 3538.04;
-	    value	     uniform 3538.04;
+        T0           uniform T_VAL;
+	    value	     uniform T_VAL;
     }
     wall
     {
@@ -454,6 +486,7 @@ boundaryField
 // ************************************************************************* //'''
 
 T_text = T_text.replace("T_VAL", TEMPERATURE_INPUT) #replaces the TVAL in the T file with the user inputted value for the temperature
+T_text = T_text.replace("T_AMBIENT", TEMPERATURE_AMBIENT) #replaces the T_AMBIENT in the T file with the user inputted value for the ambient temperature
 T_text = T_text.replace("GAMMA_VAL", GAMMA_INPUT) #replaces the GAMMA_VAL in the T file with the user inputted value for the gamma
 
 T_file = open(T, 'w')
