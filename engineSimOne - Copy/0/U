@@ -26,7 +26,7 @@ boundaryField
     outlet
     {
         type            waveTransmissive;
-		gamma 		1.14;
+		gamma 			1.14;
 	}
     inlet
     {
