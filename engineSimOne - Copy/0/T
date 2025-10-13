@@ -23,18 +23,16 @@ boundaryField
 {
     outlet
     {
-        type            waveTransmissive;
-        gamma           1.14;
-        fieldInf        300;
-        lInf            10;
+        type            inletOutlet;
+        inletValue      uniform 300;
         value           uniform 300;
     }
     inlet
     {
         type         totalTemperature;
-	gamma        1.14;
+		gamma        1.14;
         T0           uniform 3538.04;
-	value	     uniform 3538.04;
+		value	     uniform 3538.04;
     }
     wall
     {
