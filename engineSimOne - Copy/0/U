@@ -26,9 +26,8 @@ boundaryField
     outlet
     {
         type            waveTransmissive;
-	gamma 		1.14;
-	psi		thermo:psi;
-    }
+		gamma 		1.14;
+	}
     inlet
     {
         type            zeroGradient;
