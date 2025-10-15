@@ -26,20 +26,20 @@ boundaryField
     outlet
     {
         type            waveTransmissive;
-	field 		p;
+		field 		p;
         gamma           1.14;
         fieldInf        101353;
-	psi		thermo:psi;
+		psi		thermo:psi;
         lInf            1;
         value           uniform 101353;
     }
     inlet
     {
         type    totalPressure;
-	gamma	1.14;
-	psi	thermo:psi;
+		gamma	1.14;
+		psi	thermo:psi;
         p0      uniform 3.44738e+06;
-	value   uniform 3.44738e+06;
+		value   uniform 3.44738e+06;
     }
     wall
     {
