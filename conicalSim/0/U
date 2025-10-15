@@ -25,14 +25,12 @@ boundaryField
 {
    inlet
     {
-        type            fixedValue;
-	value 		uniform (25 0 0);
+        type            zeroGradient;
     }
     outlet
     {
         type            waveTransmissive;
-	gamma         	1.14;
-	psi		thermo:psi;
+		gamma         	1.14;
     }
     walls
     {
