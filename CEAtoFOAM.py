@@ -273,7 +273,6 @@ Tref = 298.15
 
 # Removes 'q = ' and any leading/trailing spaces
 q = q_formatted.replace("q = ", "").strip()  
-print(q)
 
 gas = ct.Solution('gri30_highT.yaml')
 allowed_species = set(gas.species_names)
@@ -408,13 +407,7 @@ boundaryField
     {
         type            noSlip;
     }
-
-    bottomEmptyFaces
-    {
-        type            empty;
-    }
-
-    topEmptyFaces
+    frontAndBackPlanes
     {
         type            empty;
     }
@@ -548,12 +541,9 @@ boundaryField
 
 // ************************************************************************* //'''
 
-
 alphat_file = open(alphat, 'w')
 alphat_file.write(alphat_text)
 alphat_file.close()
-
-
 
 
 
@@ -732,8 +722,8 @@ nut_file.close()
 
 
 pressure = "p.txt"
-ambient_pressure_Pa = str(p0)
-
+ambient_pressure_str = str(p0)
+ 
 pressure_text = '''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
@@ -790,20 +780,17 @@ boundaryField
 
 // ************************************************************************* //'''
 
-replacements = {"AMB_PRESSURE": ambient_pressure_Pa,
-                "P_VAL": str(P1)
-                ,"GAMMA_VAL": GAMMA_INPUT
+replacements = {"AMB_PRESSURE": ambient_pressure_str,
+                "P_VAL": str(P1),
+                "GAMMA_VAL": GAMMA_INPUT
 }
 for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
-    pressure_text = pressure_text.replace(old, new)
-
+     pressure_text = pressure_text.replace(old, new)
+ 
 pressure_file = open(pressure, 'w')
 pressure_file.write(pressure_text)
 pressure_file.close()
-
-
-
-
+ 
 thermophysicalProperties = "thermophysicalProperties.txt"
 
 tpp_text = '''/*--------------------------------*- C++ -*----------------------------------*\
@@ -1176,3 +1163,45 @@ for filename in ["controlDict.txt", "fvSchemes.txt", "fvSolution.txt"]:
     shutil.move(filename, os.path.join(folder_name, "system", new_name))
 
 os.chdir(folder_name)
+
+
+#CHAMBER AND NOZZLE DIMENSION CALCULATIONS (Different from CEA, uses Isentropic flow equations and thus assumes a constant gamma starting from the chamber combustion point
+#listed in the CEA output file, all the way to the nozzle exit plane point. This is a common simplification made by amateur rocket engine designers to get a good estimation of rocket
+#engine chamber and nozzle dimensions without having to do complex thermodyncamic calculations at each point along the nozzle length, which
+#takes shifting equilibrium chemistry into account as well as variable gamma values along the nozzle length
+ 
+mdot = 3.66
+ 
+# Use P1 (Pa) for numeric calculations and p0 (Pa) for ambient pressure
+A_star = A_t = (mdot / P1) * np.sqrt((R * T1)/gamma) * ((((gamma-1)/2 + 1) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))))
+ 
+Mach_Exit = np.sqrt((2.0 / (gamma - 1.0)) * ((P1 / p0) ** ((gamma - 1.0) / gamma) - 1.0))
+ 
+Ae_At = (1.0 / Mach_Exit) * ((2.0 / (gamma + 1.0)) * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
+ 
+
+
+Ae = Ae_At * A_star
+ 
+Pe = P1 * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2) ** (-gamma / (gamma - 1.0))
+ 
+Ve = np.sqrt((2.0 * gamma * R * T1) / (gamma - 1.0) * (1.0 - (Pe / P1) ** ((gamma - 1.0) / gamma)))
+ 
+Dt = 2*np.sqrt(A_t/np.pi)
+De = 2*np.sqrt(Ae/np.pi)
+
+#Output of the percentage error between the farfield ambient pressure and the exit pressure of the nozzle
+Percent_Error_P_Exit = abs((Pe - p0)/p0)*100
+print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}") 
+
+print(f"Throat Area (m^2): {round(float(A_star),4)}")
+print(f"Exit Area (m^2): {round(float(Ae),4)}")
+print(f"Throat Diameter (m): {round(float(Dt),4)}")
+print(f"Exit Diameter (m): {round(float(De),4)}")
+print(f"Exit Pressure (Pa): {round(float(Pe),2)}")
+print(f"Exit Velocity (m/s): {round(float(Ve),2)}")
+print(f"Exit Mach Number: {round(float(Mach_Exit),2)}")
+print(f"Area Ratio (Ae/At): {round(float(Ae_At),2)}")
+print(f"Mass Flow Rate (kg/s): {round(float(mdot),2)}")
+
+
