@@ -365,8 +365,8 @@ high_entropy_offset = gas.entropy_mass/R - sHoff
 
 #the following section is the generation of all necessary files required for an OpenFOAM simulation of your engine according to the prescribed thermophysical properties previously inputted
 
-a_sound = np.sqrt(gammas*R* T1)
-print(a_sound)
+a_sound = np.sqrt(gammas*R*T1)
+print("speed of sound of the gas mixture in the combustion chamber:", a_sound)
 
 #Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
 VELOCITY_INPUT = 0.1*a_sound
@@ -1170,12 +1170,25 @@ os.chdir(folder_name)
 #engine chamber and nozzle dimensions without having to do complex thermodyncamic calculations at each point along the nozzle length, which
 #takes shifting equilibrium chemistry into account as well as variable gamma values along the nozzle length
  
-mdot = 3.66
- 
+
+Mach_Exit = np.sqrt((2.0 / (gamma - 1.0)) * ((P1 / p0) ** ((gamma - 1.0) / gamma) - 1.0))
+
+design_thrust = float(input("Enter desired thrust (N): "))
+
+
+Pe = P1 * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2) ** (-gamma / (gamma - 1.0))
+
+Ve = np.sqrt((2.0 * gamma * R * T1) / (gamma - 1.0) * (1.0 - (Pe / P1) ** ((gamma - 1.0) / gamma)))
+
+mdot = design_thrust / Ve  #kg/s
+
+fuel_mdot = 1/(1+OF_Ratio)
+oxidizer_mdot = fuel_mdot*OF_Ratio
+
+print(f"Mass Flow Rate (kg/s): {float(mdot)}")
 # Use P1 (Pa) for numeric calculations and p0 (Pa) for ambient pressure
 A_star = A_t = (mdot / P1) * np.sqrt((R * T1)/gamma) * ((((gamma-1)/2 + 1) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))))
  
-Mach_Exit = np.sqrt((2.0 / (gamma - 1.0)) * ((P1 / p0) ** ((gamma - 1.0) / gamma) - 1.0))
  
 Ae_At = (1.0 / Mach_Exit) * ((2.0 / (gamma + 1.0)) * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2)) ** ((gamma + 1.0) / (2.0 * (gamma - 1.0)))
  
@@ -1194,14 +1207,17 @@ De = 2*np.sqrt(Ae/np.pi)
 Percent_Error_P_Exit = abs((Pe - p0)/p0)*100
 print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}") 
 
-print(f"Throat Area (m^2): {round(float(A_star),4)}")
-print(f"Exit Area (m^2): {round(float(Ae),4)}")
-print(f"Throat Diameter (m): {round(float(Dt),4)}")
-print(f"Exit Diameter (m): {round(float(De),4)}")
-print(f"Exit Pressure (Pa): {round(float(Pe),2)}")
-print(f"Exit Velocity (m/s): {round(float(Ve),2)}")
-print(f"Exit Mach Number: {round(float(Mach_Exit),2)}")
-print(f"Area Ratio (Ae/At): {round(float(Ae_At),2)}")
-print(f"Mass Flow Rate (kg/s): {round(float(mdot),2)}")
+print(f"Throat Area (m^2): {float(A_star)}")
+print(f"Exit Area (m^2): {float(Ae)}")
+print(f"Throat Diameter (m): {float(Dt)}")
+print(f"Exit Diameter (m): {float(De)}")
+print(f"Exit Pressure (Pa): {float(Pe)}")
+print(f"Exit Velocity (m/s): {float(Ve)}")
+print(f"Exit Mach Number: {float(Mach_Exit)}")
+print(f"Area Ratio (Ae/At): {float(Ae_At)}")
+print(f"Mass Flow Rate (kg/s): {float(mdot)}")
+
+
+
 
 
