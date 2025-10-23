@@ -300,7 +300,6 @@ gas.TPX = T1, P1, q
 # END OF USER EDITABLE PART
 #######################################################################
 
-
 gas = ct.Solution(mech) 
 gas.TPX = T1, P1, q  # <-- FIXED
 
@@ -314,7 +313,6 @@ out = cpPolynomials(P1,q,mech,tempRange1,tempRange2, step)
 
 #finds the specific gas constant for the mixture
 R = GasConstant/(round(meanMolarMass,2)) 
-
 
 #this plots the Cp(T) vs Static Temperature (K) curve for the given mixture
 npoints = 50
@@ -350,7 +348,6 @@ Hcof_rev = out[5]/R
 Lcof = list(reversed(Lcof_rev))
 Hcof = list(reversed(Hcof_rev))
 
-
 hLoff = Lcof[0] + Lcof[1]*((Tref**1)/2) + Lcof[2]*((Tref**2)/3) + Lcof[3]*((Tref**3)/4) + Lcof[4]*((Tref**4)/5)
 sLoff = Lcof[0]*np.log(Tref) + Lcof[1]*((Tref**1)/1) + Lcof[2]*((Tref**2)/2) + Lcof[3]*((Tref**3)/3) + Lcof[4]*((Tref**4)/4)
 
@@ -371,7 +368,7 @@ print("speed of sound of the gas mixture in the combustion chamber:", a_sound)
 #Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
 VELOCITY_INPUT = 0.1*a_sound
 U = "U.txt"
-U_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+U_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -427,7 +424,7 @@ TEMPERATURE_INPUT = str(T1)
 TEMPERATURE_AMBIENT = str(Tamb + 273.15) #converts the ambient temperature from Celsius to Kelvin
 T = "T.txt"
 GAMMA_INPUT = str(gamma)
-T_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+T_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -491,7 +488,7 @@ T_file.close()
 
 
 alphat = "alphat.txt"
-alphat_text = '''
+alphat_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
 | \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \    /   O peration     | Version:  v2412                                 |
@@ -546,9 +543,8 @@ alphat_file.write(alphat_text)
 alphat_file.close()
 
 
-
 epsilon = "epsilon.txt"
-epsilon_text = '''
+epsilon_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
 | \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \    /   O peration     | Version:  v2412                                 |
@@ -604,10 +600,9 @@ epsilon_file.close()
 
 
 
-
 k = "k.txt"
 
-k_text = '''
+k_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -666,7 +661,7 @@ k_file.close()
 
 nut = "nut.txt"
 
-nut_text = '''
+nut_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -724,7 +719,7 @@ nut_file.close()
 pressure = "p.txt"
 ambient_pressure_str = str(p0)
  
-pressure_text = '''
+pressure_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -793,7 +788,7 @@ pressure_file.close()
  
 thermophysicalProperties = "thermophysicalProperties.txt"
 
-tpp_text = '''/*--------------------------------*- C++ -*----------------------------------*\
+tpp_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \\    /   O peration     | Version:  v2412                                 |
@@ -880,7 +875,7 @@ thermo_file.close()
 
 turbulenceProperties = "turbulenceProperties.txt"
 
-turbProp_text = '''
+turbProp_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*| =========                 |                                                 |
 | \      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
 |  \    /   O peration     | Version:  v2412                                 |
@@ -916,7 +911,7 @@ turbulence_file.close()
 
 control_dict = "controlDict.txt"
 
-control_dict_text = '''
+control_dict_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -1001,7 +996,7 @@ control_dict_file.close()
 
 fv_schemes = "fvSchemes.txt"
 
-fv_schemes_text = '''
+fv_schemes_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -1075,7 +1070,7 @@ fv_schemes_file.close()
 
 fv_solutions = "fvSolution.txt"
 
-fv_solutions_text = '''
+fv_solutions_text = r'''
 /*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -1203,6 +1198,37 @@ Ve = np.sqrt((2.0 * gamma * R * T1) / (gamma - 1.0) * (1.0 - (Pe / P1) ** ((gamm
 Dt = 2*np.sqrt(A_t/np.pi)
 De = 2*np.sqrt(Ae/np.pi)
 
+Rt = Dt/2
+Re = De/2
+
+Dt_cm = Dt*100
+
+Ec = Ac_At = (8*(Dt_cm)**-0.6)+1.25
+
+L_star = 1.2
+V_chamber = L_star * A_t
+
+Ac = Ac_At * A_t
+
+Dc = 2*np.sqrt(Ac/np.pi)
+Rc = Dc/2
+
+convergent_half_angle = float(input("Enter convergent half angle (degrees): "))
+divergent_half_angle = float(input("Enter divergent half angle (degrees): "))
+
+R_throat = 1.5*Rt
+
+Lconv = (Rt*(np.sqrt(Ac_At)-1)+(R_throat)*(1/np.cos(np.radians(convergent_half_angle)-1)))/np.tan(np.radians(convergent_half_angle))
+
+Ldiv = (R_throat*(np.sqrt(Ae_At)-1)+(Re)*(1/np.cos(np.radians(divergent_half_angle)-1)))/np.tan(np.radians(divergent_half_angle))
+
+V_cone = (1/3)*np.pi*(Rc**2+(Rc*Rt)+Rt**2)*Lconv
+
+V_chamber_new = V_chamber - V_cone
+
+L_cylindrical = V_chamber_new/Ac
+
+
 #Output of the percentage error between the farfield ambient pressure and the exit pressure of the nozzle
 Percent_Error_P_Exit = abs((Pe - p0)/p0)*100
 print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}") 
@@ -1216,8 +1242,10 @@ print(f"Exit Velocity (m/s): {float(Ve)}")
 print(f"Exit Mach Number: {float(Mach_Exit)}")
 print(f"Area Ratio (Ae/At): {float(Ae_At)}")
 print(f"Mass Flow Rate (kg/s): {float(mdot)}")
-
-
-
+print(f"Chamber Diameter (m): {float(Dc)}")
+print(f"Convergent Length (m): {float(Lconv)}")
+print(f"Cylindrical Chamber Length (m): {float(L_cylindrical)}")
+print(f"Divergent Length (m): {float(Ldiv)}")
+print(f"Radius of Curvature at Throat (m): {float(R_throat)}")
 
 
