@@ -265,7 +265,7 @@ P1 = Pressure_Input*6894.76;
 T1 = chamber_temp
 gamma = gammas
 
-#these are the Tlow and Thigh values for the OpenFOAM thermophysicalProperties file also coinciding with the Sutherland gri30_highT.yaml file temperature value ranges
+#these are the Tlow and Thigh values for the Openfoam thermophysicalProperties file also coinciding with the Sutherland gri30_highT.yaml file temperature value ranges
 Tlow = 200
 Thigh = 6000 
 Tcommon = 1000
@@ -1214,13 +1214,15 @@ Dc = 2*np.sqrt(Ac/np.pi)
 Rc = Dc/2
 
 convergent_half_angle = float(input("Enter convergent half angle (degrees): "))
+convergent_half_angle = np.radians(convergent_half_angle)
 divergent_half_angle = float(input("Enter divergent half angle (degrees): "))
+divergent_half_angle = np.radians(divergent_half_angle)
 
 R_throat = 1.5*Rt
 
-Lconv = (Rt*(np.sqrt(Ac_At)-1)+(R_throat)*(1/np.cos(np.radians(convergent_half_angle)-1)))/np.tan(np.radians(convergent_half_angle))
+Lconv = (Rt*(np.sqrt(Ac_At)-1)+(R_throat)*(1/np.cos(convergent_half_angle)-1))/np.tan(convergent_half_angle)
 
-Ldiv = (R_throat*(np.sqrt(Ae_At)-1)+(Re)*(1/np.cos(np.radians(divergent_half_angle)-1)))/np.tan(np.radians(divergent_half_angle))
+Ldiv = (Rt*(np.sqrt(Ae_At)-1)+(R_throat)*(1/np.cos(divergent_half_angle)-1))/np.tan(divergent_half_angle)
 
 V_cone = (1/3)*np.pi*(Rc**2+(Rc*Rt)+Rt**2)*Lconv
 
@@ -1235,8 +1237,11 @@ print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}")
 
 print(f"Throat Area (m^2): {float(A_star)}")
 print(f"Exit Area (m^2): {float(Ae)}")
+print(f"Chamber Area (m^2): {float(Ac)}")
 print(f"Throat Diameter (m): {float(Dt)}")
 print(f"Exit Diameter (m): {float(De)}")
+print("Contraction Ratio (Ec): {:.2f}".format(Ec))
+print("Expansion Ratio (Ae/At): {:.2f}".format(Ae_At))
 print(f"Exit Pressure (Pa): {float(Pe)}")
 print(f"Exit Velocity (m/s): {float(Ve)}")
 print(f"Exit Mach Number: {float(Mach_Exit)}")
@@ -1246,6 +1251,61 @@ print(f"Chamber Diameter (m): {float(Dc)}")
 print(f"Convergent Length (m): {float(Lconv)}")
 print(f"Cylindrical Chamber Length (m): {float(L_cylindrical)}")
 print(f"Divergent Length (m): {float(Ldiv)}")
+print("Chamber Volume (m^3): {:.4f}".format(V_chamber_new))
 print(f"Radius of Curvature at Throat (m): {float(R_throat)}")
 
+def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
+    """
+    Piecewise-linear nozzle contour:
+      - straight cylindrical chamber from x=0 to x=L_cylindrical (radius = Rc)
+      - straight convergent from x=L_cylindrical to throat at x=L_cylindrical+Lconv (radius = Rt)
+      - optional tiny throat smoothing (disabled here)
+      - straight divergent cone from throat to exit (x=L_cylindrical+Lconv+Ldiv, radius=Re)
+    This ensures the chamber section up to the first blue point is flat, and the diverging
+    section is a straight line up to the exit point.
+    """
+    # key axial positions
+    x0 = 0.0
+    x_ch_end = L_cylindrical
+    x_throat = L_cylindrical + Lconv
+    x_exit = L_cylindrical + Lconv + Ldiv
 
+    # piecewise sampling
+    n_ch = 4
+    n_conv = 80
+    n_div = 80
+
+    x_ch = np.linspace(x0, x_ch_end, n_ch)
+    y_ch = np.full_like(x_ch, Rc)
+
+    x_conv = np.linspace(x_ch_end, x_throat, n_conv)
+    y_conv = np.linspace(Rc, Rt, n_conv)
+
+    x_div = np.linspace(x_throat, x_exit, n_div)
+    y_div = np.linspace(Rt, Re, n_div)
+
+    # combine
+    x = np.concatenate([x_ch, x_conv[1:], x_div[1:]])
+    y = np.concatenate([y_ch, y_conv[1:], y_div[1:]])
+
+    plt.figure(figsize=(9,4.5))
+    plt.plot(x, y, '-r', lw=2, label='nozzle contour (piecewise linear)')
+    plt.plot(x, -y, '-r', lw=2)  # mirrored lower half if desired
+    # mark the key blue points: chamber end, throat, exit
+    plt.scatter([x_ch_end, x_throat, x_exit], [Rc, Rt, Re], c='b', zorder=10)
+    plt.annotate('chamber end', (x_ch_end, Rc), xytext=(6,6), textcoords='offset points')
+    plt.annotate('throat', (x_throat, Rt), xytext=(6,-12), textcoords='offset points')
+    plt.annotate('exit', (x_exit, Re), xytext=(6,6), textcoords='offset points')
+
+    plt.xlabel('Axial distance [m]')
+    plt.ylabel('Radius [m]')
+    plt.title('Nozzle contour (chamber - convergent - throat - diverging cone)')
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.grid(alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(savefile, dpi=200, bbox_inches='tight')
+    plt.show()
+    print(f'Nozzle contour plotted and saved to: {savefile}')
+
+# replace call to previous plot function with this one
+plot_nozzle_contour_piecewise()
