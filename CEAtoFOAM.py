@@ -8,36 +8,54 @@ import cantera as ct
 from CEA_Wrap import Fuel, Oxidizer, RocketProblem
 import os
 
+
 #using RP-1 and LOX as Propellants
 #Chemical composition is not defined, thus, the program will use the default CEA values for the specified propellant
 
 Pressure_Input = float(input("Enter Chamber Pressure (PSI): "))
 Fuel_Input = input("Enter Fuel (RP-1,H2(L),CH4(L)): ")
 Oxidizer_Input = input("Enter Oxidizer (O2(L),N2O4,O2): ")
-OF_Ratio = float(input("Enter O/F Ratio: "))
 Design_altitude = float(input("Enter Design Altitude (ft): "))
-altitude = Design_altitude*0.3048 #converts feet to meters
-
-
-
+alt_m = Design_altitude*0.3048 #converts feet to meters
 
 #AMBIENT PRESSURE CALCULATION SECTION
 
 #----------------------------------------------------------------------------------------#
-if (11000*0.3048<altitude) and (altitude<25000*0.3048):
-    Tamb = -56.46 #CELSIUS
-    p0 = 1000*(22.65*np.exp(1.73-0.000157*altitude)) #Pascals, converting from kPa to Pa with *1000 https://www.grc.nasa.gov/www/k-12/airplane/atmosmet.html
-elif altitude>=25000*0.3048:
-    Tamb = -131.21 + 0.00299*altitude #CELSIUS
-    p0 = 1000*(2.488*((Tamb+273.1)/216.6)**(-11.388)) # the altitude pressure in Pascals
-else:
-    #For altitudes 0 to 11,000 m
-    Tamb = 15.04 - 0.00649*altitude
-    p0 = 1000*(101.29*((Tamb+273.1)/288.08)**5.256)
+def isa_ambient(alt_m):
+    p0 = 101325.0      # Pa (sea level)
+    T0 = 288.15        # K (sea level)
+    g  = 9.80665       # m/s^2
+    R  = 287.058       # J/(kg·K) (air)
+    L  = 0.0065        # K/m lapse rate up to 11 km
+
+    if alt_m < 11000.0:
+        T = T0 - L * alt_m
+        p = p0 * (T / T0) ** (g / (R * L))
+    elif alt_m < 25000.0:
+        # isothermal layer from 11 km to 25 km using values at 11 km
+        T11 = T0 - L * 11000.0
+        p11 = p0 * (T11 / T0) ** (g / (R * L))
+        p = p11 * np.exp(-g * (alt_m - 11000.0) / (R * T11))
+        T = T11
+    else:
+        # fallback: continue using 25 km approx (you can improve this if needed)
+        T11 = T0 - L * 11000.0
+        p11 = p0 * (T11 / T0) ** (g / (R * L))
+        p = p11 * np.exp(-g * (alt_m - 11000.0) / (R * T11))
+        T = T11
+
+    return p, (T - 273.15)  # return Pa and °C
+
+    # call it using altitude (already converted to meters earlier)
+p0, Tamb = isa_ambient(alt_m)
+
+
 #---------------------------------------------------------------------------------------#
 
 
 p0_psi = p0*0.000145038 #converts Pascals to PSI for use in the CEA code
+
+print(p0)
 ambient_pressure = p0_psi
 
 fuel_temps = {
@@ -58,6 +76,14 @@ temp_oxidizer = oxidizer_temps.get(Oxidizer_Input)
 if temp_fuel is None or temp_oxidizer is None:
     print("Invalid fuel or oxidizer selection.")
     sys.exit(1)
+
+
+OF_Ratio = float(input("Enter O/F Ratio: "))
+
+
+
+
+
 
 mat1 = Fuel(str(Fuel_Input), temp_fuel, wt_percent=100, mols=None, chemical_composition = None, hf = None)
 mat2 = Oxidizer(str(Oxidizer_Input),temp_oxidizer,wt_percent=100,mols=None,chemical_composition=None,hf=None)
@@ -265,7 +291,7 @@ P1 = Pressure_Input*6894.76;
 T1 = chamber_temp
 gamma = gammas
 
-#these are the Tlow and Thigh values for the Openfoam thermophysicalProperties file also coinciding with the Sutherland gri30_highT.yaml file temperature value ranges
+#these are the Tlow and Thigh values for the OpenFOAM thermophysicalProperties file also coinciding with the Sutherland gri30_highT.yaml file temperature value ranges
 Tlow = 200
 Thigh = 6000 
 Tcommon = 1000
@@ -1168,7 +1194,8 @@ os.chdir(folder_name)
 
 Mach_Exit = np.sqrt((2.0 / (gamma - 1.0)) * ((P1 / p0) ** ((gamma - 1.0) / gamma) - 1.0))
 
-design_thrust = float(input("Enter desired thrust (N): "))
+design_thrust = float(input("Enter desired thrust (lb): "))
+design_thrust = design_thrust * 4.44822  #converts lb to Newtons
 
 
 Pe = P1 * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2) ** (-gamma / (gamma - 1.0))
@@ -1214,15 +1241,13 @@ Dc = 2*np.sqrt(Ac/np.pi)
 Rc = Dc/2
 
 convergent_half_angle = float(input("Enter convergent half angle (degrees): "))
-convergent_half_angle = np.radians(convergent_half_angle)
 divergent_half_angle = float(input("Enter divergent half angle (degrees): "))
-divergent_half_angle = np.radians(divergent_half_angle)
 
 R_throat = 1.5*Rt
 
-Lconv = (Rt*(np.sqrt(Ac_At)-1)+(R_throat)*(1/np.cos(convergent_half_angle)-1))/np.tan(convergent_half_angle)
+Lconv = (Rt*(np.sqrt(Ac_At)-1)+(R_throat)*(1/np.cos(np.radians(convergent_half_angle)-1)))/np.tan(np.radians(convergent_half_angle))
 
-Ldiv = (Rt*(np.sqrt(Ae_At)-1)+(R_throat)*(1/np.cos(divergent_half_angle)-1))/np.tan(divergent_half_angle)
+Ldiv = (R_throat*(np.sqrt(Ae_At)-1)+(Re)*(1/np.cos(np.radians(divergent_half_angle)-1)))/np.tan(np.radians(divergent_half_angle))
 
 V_cone = (1/3)*np.pi*(Rc**2+(Rc*Rt)+Rt**2)*Lconv
 
@@ -1237,11 +1262,8 @@ print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}")
 
 print(f"Throat Area (m^2): {float(A_star)}")
 print(f"Exit Area (m^2): {float(Ae)}")
-print(f"Chamber Area (m^2): {float(Ac)}")
 print(f"Throat Diameter (m): {float(Dt)}")
 print(f"Exit Diameter (m): {float(De)}")
-print("Contraction Ratio (Ec): {:.2f}".format(Ec))
-print("Expansion Ratio (Ae/At): {:.2f}".format(Ae_At))
 print(f"Exit Pressure (Pa): {float(Pe)}")
 print(f"Exit Velocity (m/s): {float(Ve)}")
 print(f"Exit Mach Number: {float(Mach_Exit)}")
@@ -1251,7 +1273,6 @@ print(f"Chamber Diameter (m): {float(Dc)}")
 print(f"Convergent Length (m): {float(Lconv)}")
 print(f"Cylindrical Chamber Length (m): {float(L_cylindrical)}")
 print(f"Divergent Length (m): {float(Ldiv)}")
-print("Chamber Volume (m^3): {:.4f}".format(V_chamber_new))
 print(f"Radius of Curvature at Throat (m): {float(R_throat)}")
 
 def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
@@ -1270,23 +1291,29 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
     x_throat = L_cylindrical + Lconv
     x_exit = L_cylindrical + Lconv + Ldiv
 
+
     # piecewise sampling
     n_ch = 4
     n_conv = 80
     n_div = 80
 
+
     x_ch = np.linspace(x0, x_ch_end, n_ch)
     y_ch = np.full_like(x_ch, Rc)
+
 
     x_conv = np.linspace(x_ch_end, x_throat, n_conv)
     y_conv = np.linspace(Rc, Rt, n_conv)
 
+
     x_div = np.linspace(x_throat, x_exit, n_div)
     y_div = np.linspace(Rt, Re, n_div)
+
 
     # combine
     x = np.concatenate([x_ch, x_conv[1:], x_div[1:]])
     y = np.concatenate([y_ch, y_conv[1:], y_div[1:]])
+
 
     plt.figure(figsize=(9,4.5))
     plt.plot(x, y, '-r', lw=2, label='nozzle contour (piecewise linear)')
@@ -1296,6 +1323,7 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
     plt.annotate('chamber end', (x_ch_end, Rc), xytext=(6,6), textcoords='offset points')
     plt.annotate('throat', (x_throat, Rt), xytext=(6,-12), textcoords='offset points')
     plt.annotate('exit', (x_exit, Re), xytext=(6,6), textcoords='offset points')
+
 
     plt.xlabel('Axial distance [m]')
     plt.ylabel('Radius [m]')
@@ -1307,5 +1335,7 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
     plt.show()
     print(f'Nozzle contour plotted and saved to: {savefile}')
 
+
 # replace call to previous plot function with this one
 plot_nozzle_contour_piecewise()
+
