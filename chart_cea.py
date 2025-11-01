@@ -39,6 +39,7 @@ if temp_fuel is None or temp_oxidizer is None:
     sys.exit(1)
 
 OF_ratio = np.arange(1.0, 5.0 + 0.05, 0.05)  # start, stop (inclusive), step
+Isp_values = []
 temperatures = []
 for OF in OF_ratio:
     mat1 = Fuel(str(Fuel_Input), temp_fuel, wt_percent=100, mols=None, chemical_composition = None, hf = None)
@@ -59,12 +60,34 @@ for OF in OF_ratio:
                         break
     except FileNotFoundError:
         chamber_temp = float('nan')
+        
+    Isp = None
+    try:
+        with open('my_output.out', 'r') as infile:
+            for line in infile:
+                if "Isp" in line:
+                    nums = re.findall(r'[-+]?\d*\.\d+|\d+', line)
+                    if nums:
+                        # take last numeric token on the line (adjust if CEARUN format differs)
+                        Isp = float(nums[0])
+                        print(f"Specific Impulse for O/F={OF}: {Isp} s")
+                        break
+    except FileNotFoundError:
+        Isp = float('nan')
 
     # append once per OF iteration (use NaN if parsing failed)
     temperatures.append(chamber_temp)
+    Isp_values.append(Isp)
 
 # plot after the loop so x and y lengths match
 plt.plot(OF_ratio, temperatures, marker='o', linestyle='-')
+plt.plot(OF_ratio, Isp_values, marker='x', linestyle='--', color='orange')
+max_isp = np.max(Isp_values) if Isp_values else None
+if max_isp is not None:
+    print("Maximum Specific Impulse (s): ", max_isp)
+    stoich_OF_Ratio_isp = OF_ratio[np.argmax(Isp_values)]
+    print("Stoichiometric O/F Ratio for Max Isp: ", stoich_OF_Ratio_isp)
+    plt.axvline(x=stoich_OF_Ratio_isp, color='green', linestyle='--', label='Stoichiometric O/F Ratio for Max Isp')
 max_temp = np.max(temperatures) #temperature of the stoichiometric mixture ratio (which is also identified from this through the graph)
 print("Maximum Chamber Temperature (K): ", max_temp)
 stoich_OF_Ratio = OF_ratio[np.argmax(temperatures)]
