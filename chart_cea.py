@@ -69,7 +69,7 @@ for OF in OF_ratio:
                     nums = re.findall(r'[-+]?\d*\.\d+|\d+', line)
                     if nums:
                         # take last numeric token on the line (adjust if CEARUN format differs)
-                        Isp = float(nums[0])
+                        Isp = float(nums[1])
                         print(f"Specific Impulse for O/F={OF}: {Isp} s")
                         break
     except FileNotFoundError:
@@ -80,19 +80,19 @@ for OF in OF_ratio:
     Isp_values.append(Isp)
 
 # plot after the loop so x and y lengths match
-plt.plot(OF_ratio, temperatures, marker='o', linestyle='-')
-plt.plot(OF_ratio, Isp_values, marker='x', linestyle='--', color='orange')
+plt.plot(OF_ratio, temperatures, marker='o', linestyle='-',color='black',markersize=3)
+plt.plot(OF_ratio, Isp_values, marker='o', linestyle='--', color='black',markersize=3)
 max_isp = np.max(Isp_values) if Isp_values else None
 if max_isp is not None:
     print("Maximum Specific Impulse (s): ", max_isp)
     stoich_OF_Ratio_isp = OF_ratio[np.argmax(Isp_values)]
     print("Stoichiometric O/F Ratio for Max Isp: ", stoich_OF_Ratio_isp)
-    plt.axvline(x=stoich_OF_Ratio_isp, color='green', linestyle='--', label='Stoichiometric O/F Ratio for Max Isp')
-max_temp = np.max(temperatures) #temperature of the stoichiometric mixture ratio (which is also identified from this through the graph)
+    plt.axvline(x=stoich_OF_Ratio_isp, color='black', linestyle='--', label='O/F Ratio for Max Isp')
+max_temp = np.max(temperatures) #temperature of the stoichiometric mixture ratio (which is also identified through the graph)
 print("Maximum Chamber Temperature (K): ", max_temp)
 stoich_OF_Ratio = OF_ratio[np.argmax(temperatures)]
 print("Stoichiometric O/F Ratio: ", stoich_OF_Ratio)
-plt.axvline(x=stoich_OF_Ratio, color='red', linestyle='--', label='Stoichiometric O/F Ratio')
+plt.axvline(x=stoich_OF_Ratio, color='black', linestyle=':', label='Stoichiometric O/F Ratio')
 
 
 def on_pick(event):
@@ -111,7 +111,7 @@ def on_pick(event):
 
 x = OF_ratio
 y = temperatures
-line, = plt.plot(x, y, 'o', picker=5) # Enable picking for the points
+line, = plt.plot(x, y, 'o', picker=5,color = 'black',markersize = 3) # Enable picking for the points
 
 plt.gcf().canvas.mpl_connect('pick_event', on_pick)
 
@@ -120,5 +120,5 @@ plt.gcf().canvas.mpl_connect('pick_event', on_pick)
 plt.xlabel('O/F Ratio')
 plt.ylabel('Chamber Temperature (K)')
 plt.title(f'Chamber Temperature vs O/F Ratio for {Fuel_Input} and {Oxidizer_Input}')
-plt.grid()
+plt.legend()
 plt.show()
