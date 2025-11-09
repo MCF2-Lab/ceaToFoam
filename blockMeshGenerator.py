@@ -1,60 +1,27 @@
-#wrapper code for CEARUN using Python "CEA-Wrap" library using version 1.7.4 of CEA_Wrap
-import shutil
-import sys
-from matplotlib import pyplot as plt
 import numpy as np
-from cantera import *
-import cantera as ct
-from CEAtoFOAM import Fuel, Oxidizer, RocketProblem, Mach_Exit, design_thrust,fuel_mdot,oxidizer_mdot ,Pe, Ve, mdot, A_star, Ae_At, Ae, Dt, De, Rt, Re, Ec, L_star, V_chamber, Ac, Dc, Rc, convergent_half_angle, divergent_half_angle, R_throat, Lconv, Ldiv, V_chamber_new, L_cylindrical,gamma,P1,p0,R,T1,OF_Ratio
-import os
 import math
+import matplotlib                       # import matplotlib and its its components for plotting
+import matplotlib.pyplot as plt
+#from CEAtoFOAM import Rt,Rc,L_cylindrical,Ldiv,Lconv,R_throat,divergent_half_angle,convergent_half_angle,Re
 
 
 
-#Output of the percentage error between the farfield ambient pressure and the exit pressure of the nozzle
-Percent_Error_P_Exit = abs((Pe - p0)/p0)*100
-print(f"Percent Error in Exit Pressure (%): {float(Percent_Error_P_Exit)}") 
-
-print(f"Throat Area (m^2): {float(A_star)}")
-print(f"Exit Area (m^2): {float(Ae)}")
-print(f"Chamber Area (m^2): {float(Ac)}")
-print(f"Throat Diameter (m): {float(Dt)}")
-print(f"Throat Radius (m): {float(Rt)}")
-print(f"Chamber Diameter (m): {float(Dc)}")
-print(f"Chamber Radius (m): {float(Rc)}")
-print(f"Exit Diameter (m): {float(De)}")
-print("Contraction Ratio (Ec): {:.2f}".format(Ec))
-print("Expansion Ratio (Ae/At): {:.2f}".format(Ae_At))
-print(f"Exit Pressure (Pa): {float(Pe)}")
-print(f"Exit Velocity (m/s): {float(Ve)}")
-print(f"Exit Mach Number: {float(Mach_Exit)}")
-print(f"Area Ratio (Ae/At): {float(Ae_At)}")
-print(f"Mass Flow Rate (kg/s): {float(mdot)}")
-print(f"Fuel Mass Flow Rate (kg/s): {float(fuel_mdot)}")
-print(f"Oxidizer Mass Flow Rate (kg/s): {float(oxidizer_mdot)}")
-print(f"Chamber Diameter (m): {float(Dc)}")
-print(f"Convergent Length (m): {float(Lconv)}")
-print(f"Cylindrical Chamber Length (m): {float(L_cylindrical)}")
-print(f"Divergent Length (m): {float(Ldiv)}")
-print("Chamber Volume (m^3): {:.4f}".format(V_chamber_new))
-print(f"Radius of Curvature at Throat (m): {float(R_throat)}")
-
-comb_r=0.215 # radius of combustion chamber
-comb_l=0.435 # straight length of combustion chamber
-comb_r1=0.150 # curvature radius of combustion chamber tapering
-comb_half_angle= 35 # half angle of the combustion chamber tapering
-throat_r=0.0829 # radius at the nozzle
-comb_full_l=0.723 # length of combustion chamber till throat
-throat_curv_r=0.165 # curvature radius at the nozzle throat
-div_half_angle_1=20 # half angle of the diverging section
+comb_r=0.05118222 # radius of combustion chamber
+comb_l=0.24557508 # straight length of combustion chamber
+comb_r1=0.01# curvature radius of combustion chamber tapering
+comb_half_angle= 30 # half angle of the combustion chamber tapering
+throat_r=0.02461207 # radius at the nozzle
+comb_full_l=0.30148811 # length of combustion chamber till throat
+throat_curv_r=0.0369181 # curvature radius at the nozzle throat
+div_half_angle_1=15 # half angle of the diverging section
 straight_1=0.01 # first transitional straight section
-div_r=5.8# curvature radius of the diverging nozzle bell
+div_r = None  # no bell curvature for a purely conical nozzle
 straight_2=0.014 # straight section at the nozzle exit
-div_half_angle_2=10 # half angle of the diverging section at the termination
-total_l=1.779 # total length of the engine
-bell_r=0.360 # radius of the nozzle bell at the rim
+div_half_angle_2=15 # half angle of the diverging section at the termination
+total_l=0.43747007 # total length of the engine
+bell_r=0.05974599 # radius of the nozzle bell at the rim
 domain_r=6*bell_r # radius of the area behind the nozzle for the plume
-domain_ext=1.5*total_l+4 # extra length for the plume
+domain_ext=1.5*total_l+8 # extra length for the plume
 wedge_half_angle=2.5 # half angle to create a wedge
 
 points = np.zeros((31, 3)) # main blockmesh vertices
@@ -114,12 +81,113 @@ aux_points[0]=(comb_l+comb_r1*(math.sin(math.pi*comb_half_angle/360)),comb_r-com
 #arc central point in the throat
 aux_points[1]=(comb_full_l,throat_r, 0)
 
-# arc central point in the diverging bell
-midangle=(div_half_angle_1+div_half_angle_2)/2
-x_center=points[14,0]+div_r*math.sin(math.pi*div_half_angle_1/180)
-y_center=points[14,1]-div_r*math.cos(math.pi*div_half_angle_1/180)
-
-aux_points[2]=(x_center-div_r*math.sin(math.pi*midangle/180), y_center+div_r*math.cos(math.pi*midangle/180 ),0)
+# arc central point in the diverging bell - only if a bell arc is requested
+if div_r is not None and div_r > 0:
+    midangle = (div_half_angle_1 + div_half_angle_2) / 2.0
+    x_center = points[14, 0] + div_r * math.sin(math.pi * div_half_angle_1 / 180.0)
+    y_center = points[14, 1] - div_r * math.cos(math.pi * div_half_angle_1 / 180.0)
+    aux_points[2] = (x_center - div_r * math.sin(math.pi * midangle / 180.0),
+                     y_center + div_r * math.cos(math.pi * midangle / 180.0), 0)
+else:
+    # no bell arc for pure cone
+    aux_points[2] = (math.nan, math.nan, 0)
 
 #plt.scatter(aux_points[0:3,0], aux_points[0:3,1])
 plt.show()
+
+
+# convert points to wedge
+
+def rotate_points(points,angle):
+    for point in points:
+        point[1]=point[1]*math.cos(math.pi*angle/180)
+        point[2]=point[1]*math.sin(math.pi*angle/180)
+    return points
+
+# generate main and aux wedge points by rotation
+points[20:31]=rotate_points(points[9:20],-1*wedge_half_angle )
+points[9:20]=rotate_points(points[9:20],wedge_half_angle )
+aux_points[3:6]=rotate_points(aux_points[0:3],-1*wedge_half_angle )
+aux_points[0:3]=rotate_points(aux_points[0:3],wedge_half_angle )
+
+print("Blockmeshdict segment with produced vertices")
+print("vertices")
+print("(")
+for i, Point in enumerate(points):
+
+    print(f"\t({Point[0]} {Point[1]} {Point[2]}) // {i} ")
+print(");")
+
+
+axis_point_numbers=np.arange(0,9) #  poit numbers on the axis
+wedge_point_numbers_1=np.arange(9,20) #  point numbers on the first wedge
+wedge_point_numbers_2=np.arange(20,31) #  point numbers on the second wedge
+# number of generated blocks
+n_blocks=7
+
+# define function that creates pseudo 4-point cross-sections for the main engine part
+def contour(i):
+    return [axis_point_numbers[i], wedge_point_numbers_2[i], wedge_point_numbers_1[i], axis_point_numbers[i]]
+
+contours=[contour(i) for i in range(n_blocks+1)] #  define list of contours
+blocks=[contours[i]+contours[i+1] for i in range(7)] #define list of blocks
+
+y_cells=[20 for i in range(n_blocks)] # define list of cell numbers in y-direction  (uniform)
+x_cells=[int((points[i+1,0]-points[i,0])/0.005+1) for i in range(n_blocks)] # define list of cell numbers in x-direction  (every 5 mm)
+
+# generate block section of blockmeshdict
+print("blocks")
+print("(")
+for i,block in enumerate(blocks):
+    
+    print (f'\thex ({block[0]} {block[1]} {block[2]} {block[3]} {block[4]} {block[5]} {block[6]} {block[7]} ) ({y_cells[i]} 1 {x_cells[i]}) simpleGrading (1 1 1)')
+
+
+# number of generated blocks
+
+# generate asym1 surfaces for wedge BC
+asym1=[[contours[i][0],contours[i][2],contours[i+1][2],contours[i+1][0]] for i in range(n_blocks) ]
+print (f'asym1 patches')
+for patch in asym1:
+    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+
+# generate asym2 surfaces for wedge BC
+
+asym2=[[contours[i+1][0],contours[i+1][1],contours[i][1],contours[i][0]] for i in range(n_blocks) ]
+print (f'asym2 patches')
+for patch in asym2:
+    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    
+# generate nozzle surfaces for nozzle wall BC
+#nozzle[i]=np.array((wedges[i,2],wedges[i,1], wedges[i+1,1], wedges[i+1,2]))
+nozzle=[[contours[i][2],contours[i][1],contours[i+1][1],contours[i+1][2]] for i in range(n_blocks) ]
+print (f'nozzle patches')
+for patch in nozzle:
+    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+
+# generate inlet surfaces for inlet BC
+print (f'inlet patch')
+inlet=contours[0]
+print(f'\t({inlet[0]} {inlet[1]} {inlet[2]} {inlet[3]} )')
+
+# generate outlet surfaces for outlet BC
+
+print (f'outlet patch')
+outlet=contours[n_blocks]
+print(f'({outlet[0]} {outlet[1]} {outlet[2]} {outlet[3]} )')
+
+
+print(f'arcs for the nozzle')
+
+print("edges")
+print("(")
+
+print(f'\t arc 10 11 ({aux_points[0,0]} {aux_points[0,1]} {aux_points[0,2]})')
+print(f'\t arc 12 13 ({aux_points[1,0]} {aux_points[1,1]} {aux_points[1,2]})')
+if div_r is not None and div_r > 0:
+    print(f'\t arc 14 15 ({aux_points[2,0]} {aux_points[2,1]} {aux_points[2,2]})')
+print(f'\t arc 21 22 ({aux_points[3,0]} {aux_points[3,1]} {aux_points[3,2]})')
+print(f'\t arc 23 24 ({aux_points[4,0]} {aux_points[4,1]} {aux_points[4,2]})')
+#print(f'\t arc 25 26 ({aux_points[5,0]} {aux_points[5,1]} {aux_points[5,2]})')
+
+print(");")
