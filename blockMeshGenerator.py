@@ -241,7 +241,7 @@ edge12_text = "\n".join(edge1_text)
 
 
 edge2_2 =(f'\t arc 12 13 ({aux_points[1,0]} {aux_points[1,1]} {aux_points[1,2]})')
-edge2_text.append(edge2_2)
+print(edge2_2)
 edge2_text2 = "\n".join(edge2_text)
 
 
@@ -393,13 +393,13 @@ mergePatchPairs
 
 replacements = {"VERT_TEXT": vertices_text,
                 "BLOX_TEXT": str(blocks_text2),
-                "EDGE1_txt": str(edge1_text),
-                "EDGE2_txt": str(edge2_text),
-                "EDGE3_txt": str(edge3_text),
-                "EDGE4_txt": str(edge4_text),
+                "EDGE1_txt": str(edge12_text),
+                "EDGE2_txt": str(edge2_text2),
+                "EDGE3_txt": str(edge3_text2),
+                "EDGE4_txt": str(edge4_text2),
                 #"EDGE5_txt": str(edge5_text),
                 "INLET_TEXT": str(inlet_text2),
-                "ASYM1_TEXT": str(asym_text22),
+                "ASYM1_TEXT": str(asym1_text2),
                 "ASYM2_TEXT": str(asym2_text),
                 "NOZZLE_TEXT": str(nozzle_text2)
 
