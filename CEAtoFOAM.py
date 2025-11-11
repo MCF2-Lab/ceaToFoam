@@ -332,12 +332,12 @@ cpHbyR = np.zeros(npoints)
 cpLbyR = np.polyval(out[2], temRL)
 cpHbyR = np.polyval(out[5], temRH)
 
-plt.plot(temRL,cpLbyR, lw=2)
-plt.plot(temRH,cpHbyR, lw=2)
+plt.plot(temRL,cpLbyR, lw=2,color = 'black')
+plt.plot(temRH,cpHbyR, lw=2,color = 'black',linestyle='--')
 
 plt.xlabel('Temperature (K)')
 plt.ylabel('$C_p$ [J/kg/K]')
-plt.grid(color='b', alpha=0.5, linewidth=0.5)
+plt.grid(color='black', alpha=0.5, linewidth=0.5)
 
 #plt.savefig("cp_vs_T.png")
 plt.show()
@@ -356,8 +356,8 @@ cpH_divR = cpH / R
 plt.figure(figsize=(12,5))
 
 plt.subplot(1,2,1)
-plt.plot(temRL, cpL, lw=2, label='Cp (low range)')
-plt.plot(temRH, cpH, lw=2, label='Cp (high range)')
+plt.plot(temRL, cpL, lw=2, label='Cp (low range)',  color = 'black')
+plt.plot(temRH, cpH, lw=2, label='Cp (high range)', color = 'black',linestyle='--')
 plt.xlabel('Temperature (K)')
 plt.ylabel('Cp [J/kg/K]')
 plt.title('Cp vs T')
@@ -365,8 +365,8 @@ plt.grid(alpha=0.4)
 plt.legend()
 
 plt.subplot(1,2,2)
-plt.plot(temRL, cpL_divR, lw=2, label='Cp/R (low range)')
-plt.plot(temRH, cpH_divR, lw=2, label='Cp/R (high range)')
+plt.plot(temRL, cpL_divR, lw=2, label='Cp/R (low range)', color = 'black')
+plt.plot(temRH, cpH_divR, lw=2, label='Cp/R (high range)',color = 'black', linestyle='--')
 plt.xlabel('Temperature (K)')
 plt.ylabel('Cp / R')
 plt.title('Cp/R vs T')
@@ -434,7 +434,8 @@ boundaryField
 
     outlet
     {
-        type            zeroGradient;
+        type            waveTransmissive;
+        gamma           GAMMA_VAL;
     }
 
     walls
@@ -450,7 +451,9 @@ boundaryField
 
 // ************************************************************************* //'''
 
+GAMMA_INPUT = str(gamma)
 U_text = U_text.replace("XVEL", str(VELOCITY_INPUT)) #replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
+U_text = U_text.replace("GAMMA_VAL", GAMMA_INPUT) #replaces the GAMMA_VAL in the U file with the user inputted value for the gamma
 
 U_file = open(U, 'w')
 U_file.write(U_text)
@@ -460,7 +463,6 @@ U_file.close()
 TEMPERATURE_INPUT = str(T1)
 TEMPERATURE_AMBIENT = str(Tamb + 273.15) #converts the ambient temperature from Celsius to Kelvin
 T = "T.txt"
-GAMMA_INPUT = str(gamma)
 T_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
 | \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
@@ -486,10 +488,8 @@ boundaryField
 {
     outlet
     {
-        type            waveTransmissive;
-        gamma           GAMMA_VAL;
-        fieldInf        T_AMBIENT;
-        lInf            10;
+        type            inletOutlet;
+        inletValue      uniform T_AMBIENT;
         value           uniform T_AMBIENT;
     }
     inlet
@@ -499,7 +499,7 @@ boundaryField
         T0           uniform T_VAL;
 	    value	     uniform T_VAL;
     }
-    wall
+    walls
     {
         type            zeroGradient;
     }
@@ -559,7 +559,7 @@ boundaryField
         value           uniform 0;
     }
 
-    wall
+    walls
     {
         type            compressible::alphatWallFunction;
         value           uniform 0;
@@ -616,7 +616,7 @@ boundaryField
         value           uniform 266000;
     }
 
-    wall
+    walls
     {
         type            epsilonWallFunction;
         value           uniform 266000;
@@ -675,7 +675,7 @@ boundaryField
         value           uniform 1000;
     }
 
-    wall
+    walls
     {
         type            kqRWallFunction;
         value           uniform 1000;
@@ -784,11 +784,8 @@ boundaryField
 {
     outlet
     {
-        type            waveTransmissive;
-        gamma           GAMMA_VAL;
-        fieldInf        AMB_PRESSURE;
-        psi             thermo:psi;
-        lInf            1;
+        type            inletOutlet;
+        inletValue      uniform AMB_PRESSURE;
         value           uniform AMB_PRESSURE;
     }
     inlet
@@ -799,7 +796,7 @@ boundaryField
         p0              uniform P_VAL;
         value           uniform P_VAL;
     }
-    wall
+    walls
     {
         type            zeroGradient;
     }
@@ -1335,7 +1332,7 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
 
     plt.figure(figsize=(9,4.5))
     plt.plot(x, y, '-r', lw=2, label='nozzle contour (piecewise linear)')
-    #plt.plot(x, -y, '-r', lw=2)  # mirrored lower half if desired
+    plt.plot(x, -y, '-r', lw=2)  # mirrored lower half if desired
     # mark the key blue points: chamber end, throat, exit
     plt.scatter([x_ch_end, x_throat, x_exit], [Rc, Rt, Re], c='b', zorder=10)
     plt.annotate('chamber end', (x_ch_end, Rc), xytext=(6,6), textcoords='offset points')
@@ -1354,12 +1351,9 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
 
 # replace call to previous plot function with this one
 plot_nozzle_contour_piecewise()
-plt.gca().lines[-1].get_xydata()
-line_coords = []
-for line in plt.gca().lines:
-    line_coords.append(line.get_xydata().tolist())
 
 
 
 
 
+ 
