@@ -1,25 +1,28 @@
+import os
+import shutil
 import numpy as np
 import math
 import matplotlib                       # import matplotlib and its its components for plotting
 import matplotlib.pyplot as plt
-#from CEAtoFOAM import Rt,Rc,L_cylindrical,Ldiv,Lconv,R_throat,divergent_half_angle,convergent_half_angle,Re
+from CEAtoFOAM import Rt,Rc,L_cylindrical,Ldiv,Lconv,R_throat,divergent_half_angle,convergent_half_angle,Re,folder_name
+import io
 
 
 
-comb_r=0.05118222 # radius of combustion chamber
-comb_l=0.24557508 # straight length of combustion chamber
+comb_r=Rc # radius of combustion chamber
+comb_l=L_cylindrical # straight length of combustion chamber
 comb_r1=0.01# curvature radius of combustion chamber tapering
-comb_half_angle= 30 # half angle of the combustion chamber tapering
-throat_r=0.02461207 # radius at the nozzle
-comb_full_l=0.30148811 # length of combustion chamber till throat
-throat_curv_r=0.0369181 # curvature radius at the nozzle throat
-div_half_angle_1=15 # half angle of the diverging section
+comb_half_angle= convergent_half_angle # half angle of the combustion chamber tapering
+throat_r=Rt # radius at the nozzle
+comb_full_l=L_cylindrical+Lconv # length of combustion chamber till throat
+throat_curv_r=R_throat # curvature radius at the nozzle throat
+div_half_angle_1=divergent_half_angle # half angle of the diverging section
 straight_1=0.01 # first transitional straight section
 div_r = None  # no bell curvature for a purely conical nozzle
 straight_2=0.014 # straight section at the nozzle exit
-div_half_angle_2=15 # half angle of the diverging section at the termination
-total_l=0.43747007 # total length of the engine
-bell_r=0.05974599 # radius of the nozzle bell at the rim
+div_half_angle_2=divergent_half_angle # half angle of the diverging section at the termination
+total_l=(L_cylindrical+Lconv+Ldiv) # total length of the engine
+bell_r=Re # radius of the nozzle bell at the rim
 domain_r=6*bell_r # radius of the area behind the nozzle for the plume
 domain_ext=1.5*total_l+8 # extra length for the plume
 wedge_half_angle=2.5 # half angle to create a wedge
@@ -95,6 +98,8 @@ else:
 #plt.scatter(aux_points[0:3,0], aux_points[0:3,1])
 plt.show()
 
+captured_output = io.StringIO()  # Create a StringIO object to capture the output
+
 
 # convert points to wedge
 
@@ -113,10 +118,16 @@ aux_points[0:3]=rotate_points(aux_points[0:3],wedge_half_angle )
 print("Blockmeshdict segment with produced vertices")
 print("vertices")
 print("(")
+vertices_lines = []
 for i, Point in enumerate(points):
+    line = f"\t({Point[0]} {Point[1]} {Point[2]}) // {i} "
+    print(line)                     # keep console output
+    vertices_lines.append(line)
 
-    print(f"\t({Point[0]} {Point[1]} {Point[2]}) // {i} ")
 print(");")
+
+# now create the vertices_text used in replacements
+vertices_text = "\n".join(vertices_lines)
 
 
 axis_point_numbers=np.arange(0,9) #  poit numbers on the axis
@@ -138,9 +149,16 @@ x_cells=[int((points[i+1,0]-points[i,0])/0.005+1) for i in range(n_blocks)] # de
 # generate block section of blockmeshdict
 print("blocks")
 print("(")
+
+blocks_text = []
 for i,block in enumerate(blocks):
     
-    print (f'\thex ({block[0]} {block[1]} {block[2]} {block[3]} {block[4]} {block[5]} {block[6]} {block[7]} ) ({y_cells[i]} 1 {x_cells[i]}) simpleGrading (1 1 1)')
+    block = (f'\t hex ({block[0]} {block[1]} {block[2]} {block[3]} {block[4]} {block[5]} {block[6]} {block[7]} ) ({y_cells[i]} 1 {x_cells[i]}) simpleGrading (1 1 1)')
+    print(block)
+    blocks_text.append(block)
+
+    blocks_text2 = "\n".join(blocks_text)
+        
 
 
 # number of generated blocks
@@ -148,33 +166,61 @@ for i,block in enumerate(blocks):
 # generate asym1 surfaces for wedge BC
 asym1=[[contours[i][0],contours[i][2],contours[i+1][2],contours[i+1][0]] for i in range(n_blocks) ]
 print (f'asym1 patches')
+
+asym_text22 = []
 for patch in asym1:
-    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    asym1_text = (f'\t ({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    print(asym1_text)
+    asym_text22.append(asym1_text)
+    asym1_text2 = "\n".join(asym_text22)
 
 # generate asym2 surfaces for wedge BC
 
 asym2=[[contours[i+1][0],contours[i+1][1],contours[i][1],contours[i][0]] for i in range(n_blocks) ]
 print (f'asym2 patches')
+asym_text = []
 for patch in asym2:
-    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    asym_text2 = (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    print(asym_text2)
+    asym_text.append(asym_text2)
+    asym2_text = "\n".join(asym_text)
     
 # generate nozzle surfaces for nozzle wall BC
 #nozzle[i]=np.array((wedges[i,2],wedges[i,1], wedges[i+1,1], wedges[i+1,2]))
+nozzle_text = []
 nozzle=[[contours[i][2],contours[i][1],contours[i+1][1],contours[i+1][2]] for i in range(n_blocks) ]
 print (f'nozzle patches')
 for patch in nozzle:
-    print (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    nozzle2 = (f'\t({patch[0]} {patch[1]} {patch[2]} {patch[3]})')
+    print(nozzle2)
+    nozzle_text.append(nozzle2)
+    nozzle_text2 = "\n".join(nozzle_text)
 
 # generate inlet surfaces for inlet BC
 print (f'inlet patch')
 inlet=contours[0]
-print(f'\t({inlet[0]} {inlet[1]} {inlet[2]} {inlet[3]} )')
+inlet_text = []
+inlet2 = (f'\t({inlet[0]} {inlet[1]} {inlet[2]} {inlet[3]} )')
+inlet_text.append(inlet2)
+inlet_text2 = "\n".join(inlet_text)
+
+
+print(f'outlet_r patch')
+print(
+    """
+           //(7 27 16 7 ) 
+           // (8 30 19 8)//
+            //(30 29 18 19)//
+            (17 28 29 18) //
+"""
+)
 
 # generate outlet surfaces for outlet BC
 
 print (f'outlet patch')
 outlet=contours[n_blocks]
 print(f'({outlet[0]} {outlet[1]} {outlet[2]} {outlet[3]} )')
+outlet_text = captured_output.getvalue()
 
 
 print(f'arcs for the nozzle')
@@ -182,12 +228,197 @@ print(f'arcs for the nozzle')
 print("edges")
 print("(")
 
-print(f'\t arc 10 11 ({aux_points[0,0]} {aux_points[0,1]} {aux_points[0,2]})')
-print(f'\t arc 12 13 ({aux_points[1,0]} {aux_points[1,1]} {aux_points[1,2]})')
+edge1_text = []
+edge2_text = []
+edge3_text = []
+edge4_text = []
+edge5_text = []
+
+
+edge1_2 = (f'\t arc 10 11 ({aux_points[0,0]} {aux_points[0,1]} {aux_points[0,2]})')
+edge1_text.append(edge1_2)
+edge12_text = "\n".join(edge1_text)
+
+
+edge2_2 =(f'\t arc 12 13 ({aux_points[1,0]} {aux_points[1,1]} {aux_points[1,2]})')
+edge2_text.append(edge2_2)
+edge2_text2 = "\n".join(edge2_text)
+
+
+
+
 if div_r is not None and div_r > 0:
+    """
+    Prints the arc segment for the nozzle extension bell if div_r is specified by the user based on their bell geometry
+    """
     print(f'\t arc 14 15 ({aux_points[2,0]} {aux_points[2,1]} {aux_points[2,2]})')
-print(f'\t arc 21 22 ({aux_points[3,0]} {aux_points[3,1]} {aux_points[3,2]})')
-print(f'\t arc 23 24 ({aux_points[4,0]} {aux_points[4,1]} {aux_points[4,2]})')
+    #edge5_text = captured_output.getvalue()
+
+
+"""
+Prints the arc segments at the throat section of the nozzle
+"""
+edge3_2 = (f'\t arc 21 22 ({aux_points[3,0]} {aux_points[3,1]} {aux_points[3,2]})')
+edge3_text.append(edge3_2)
+edge3_text2 = "\n".join(edge3_text)
+edge4_2 = (f'\t arc 23 24 ({aux_points[4,0]} {aux_points[4,1]} {aux_points[4,2]})')
+edge4_text.append(edge4_2)
+edge4_text2 = "\n".join(edge4_text)
 #print(f'\t arc 25 26 ({aux_points[5,0]} {aux_points[5,1]} {aux_points[5,2]})')
 
 print(");")
+
+
+
+blockMeshDict = 'blockMeshDict.txt'
+
+
+blockMeshDict_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+
+vertices
+(
+  VERT_TEXT
+);
+
+blocks
+(
+    BLOX_TEXT
+    hex (7 27 16 7 8 30 19 8 ) (20 1 800) simpleGrading (1 1 1)//
+    hex (27 28 17 16 30 29 18 19 ) (30 1 800) simpleGrading (1 1 1)//
+);
+
+edges
+(
+    EDGE1_txt
+    EDGE2_txt
+    EDGE3_txt
+    EDGE4_txt
+    //EDGE5_txt
+);
+
+boundary
+(
+    inlet
+    {
+        type patch;
+        faces
+        (
+            INLET_TEXT
+            
+        );
+    }
+    asym1
+    {
+        type wedge;
+        faces
+        (
+            ASYM1_TEXT
+            (7 16 19 8)//
+            (16 17 18 19)//
+        );
+    }
+
+
+
+    outlet
+    {
+        type patch;
+        faces
+        (
+           //(7 27 16 7 ) 
+            (8 30 19 8)//
+            (30 29 18 19)//
+            //(17 28 29 18) //
+        );
+    }
+
+    outlet_r
+    {
+        type patch;
+        faces
+        (
+           //(7 27 16 7 ) 
+           // (8 30 19 8)//
+            //(30 29 18 19)//
+            (17 28 29 18) //
+        );
+    }
+
+
+
+    asym2
+    {
+        type wedge;
+        faces
+        (
+            ASYM2_TEXT
+            (8 30 27 7)//
+            (30 29 28 27) //
+        );
+    }
+    nozzle
+    {
+        type wall;
+        faces
+        (
+            NOZZLE_TEXT
+	    
+        );
+    }
+);
+
+mergePatchPairs
+(
+);
+
+// ************************************************************************* //'''
+
+
+
+replacements = {"VERT_TEXT": vertices_text,
+                "BLOX_TEXT": str(blocks_text2),
+                "EDGE1_txt": str(edge1_text),
+                "EDGE2_txt": str(edge2_text),
+                "EDGE3_txt": str(edge3_text),
+                "EDGE4_txt": str(edge4_text),
+                #"EDGE5_txt": str(edge5_text),
+                "INLET_TEXT": str(inlet_text2),
+                "ASYM1_TEXT": str(asym_text22),
+                "ASYM2_TEXT": str(asym2_text),
+                "NOZZLE_TEXT": str(nozzle_text2)
+
+}
+for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+    blockMeshDict_text = blockMeshDict_text.replace(old, new)
+
+block_file = open(blockMeshDict, 'w')
+block_file.write(blockMeshDict_text)
+block_file.close()
+
+os.makedirs(folder_name, exist_ok=True)
+os.makedirs(f"{folder_name}/0", exist_ok=True)
+os.makedirs(f"{folder_name}/constant", exist_ok=True)
+os.makedirs(f"{folder_name}/system", exist_ok=True)
+
+
+for filename in ["blockMeshDict.txt"]:
+    new_name = os.path.splitext(filename)[0]
+    shutil.move(filename, os.path.join(folder_name, "system", new_name))
+
+os.chdir(folder_name)
