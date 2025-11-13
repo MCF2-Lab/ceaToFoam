@@ -11,6 +11,18 @@ import re
 from io import StringIO
 from contextlib import redirect_stdout
 
+plt.rcParams['axes.titlesize'] = 20  # Title font size
+plt.rcParams['axes.labelsize'] = 20  # Axis label font size
+plt.rcParams['xtick.labelsize'] = 16  # X-tick label font size
+plt.rcParams['ytick.labelsize'] = 16  # Y-tick label font size
+plt.rcParams['legend.fontsize'] = 14 # Legend font size
+plt.rcParams['lines.linewidth'] = 1  # Line width for plots
+plt.rcParams['lines.markersize'] = 8  # Marker size for points
+plt.rcParams['figure.figsize'] = (10, 6)  # Default figure size
+plt.rcParams['axes.grid'] = False  # Add grid to plots
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams['legend.fontsize'] = 12
+plt.rcParams['legend.loc'] = 'upper left'  # Legend location
 
 
 Pressure_Input = float(input("Enter Chamber Pressure (PSI): "))
