@@ -1331,4 +1331,3 @@ for filename in ["controlDict.txt", "fvSchemes.txt", "fvSolution.txt","blockMesh
     shutil.move(filename, os.path.join(folder_name, "system", new_name))
 
 os.chdir(folder_name)
-
