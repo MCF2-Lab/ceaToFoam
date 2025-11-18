@@ -908,15 +908,15 @@ decomposePar_file.close()
 comb_r=Rc # radius of combustion chamber
 comb_l=L_cylindrical # straight length of combustion chamber
 comb_r1=0.01# curvature radius of combustion chamber tapering
-comb_half_angle= convergent_half_angle # half angle of the combustion chamber tapering
+comb_half_angle= 30# half angle of the combustion chamber tapering
 throat_r=Rt # radius at the nozzle
 comb_full_l=L_cylindrical+Lconv # length of combustion chamber till throat
 throat_curv_r=R_throat # curvature radius at the nozzle throat
-div_half_angle_1=divergent_half_angle # half angle of the diverging section
+div_half_angle_1=15 # half angle of the diverging section
 straight_1=0.01 # first transitional straight section
-div_r = None  # no bell curvature for a purely conical nozzle
+div_r = 0  # no bell curvature for a purely conical nozzle
 straight_2=0.014 # straight section at the nozzle exit
-div_half_angle_2=divergent_half_angle # half angle of the diverging section at the termination
+div_half_angle_2=div_half_angle_1 # half angle of the diverging section at the termination
 total_l=(L_cylindrical+Lconv+Ldiv) # total length of the engine
 bell_r=Re # radius of the nozzle bell at the rim
 domain_r=9*bell_r # radius of the area behind the nozzle for the plume
@@ -1097,6 +1097,7 @@ print (f'inlet patch')
 inlet=contours[0]
 inlet_text = []
 inlet2 = (f'\t({inlet[0]} {inlet[1]} {inlet[2]} {inlet[3]} )')
+print(inlet2)
 inlet_text.append(inlet2)
 inlet_text2 = "\n".join(inlet_text)
 
