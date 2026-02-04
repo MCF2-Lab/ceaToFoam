@@ -34,13 +34,14 @@ fuel_temps = {
     "RP-1": 298.15,
     "H2(L)": 20.283,
     "CH4(L)": 111.66,
-    "MMH": 292.0
+    "CH6N2(L)": 298.15
 }
 
 oxidizer_temps = {
     "O2(L)": 90.170,
-    "N2O4": 294.15,
+    "N2O4(L)": 294.15,
     "O2": 298.15
+
 }
 
 temp_fuel = fuel_temps.get(Fuel_Input)
@@ -49,6 +50,9 @@ temp_oxidizer = oxidizer_temps.get(Oxidizer_Input)
 if temp_fuel is None or temp_oxidizer is None:
     print("Invalid fuel or oxidizer selection.")
     sys.exit(1)
+
+# Standard gravity constant (m/s²)
+g0 = 9.80665
 
 OF_ratio = np.arange(1.0, 5.0 + 0.05, 0.05)  # start, stop (inclusive), step
 Isp_values = []
@@ -91,46 +95,58 @@ for OF in OF_ratio:
     temperatures.append(chamber_temp)
     Isp_values.append(Isp)
 
-# plot after the loop so x and y lengths match
-plt.plot(OF_ratio, temperatures, marker='o', linestyle='-',color='black',markersize=3)
-plt.plot(OF_ratio, Isp_values, marker='o', linestyle='--', color='black',markersize=3)
-max_isp = np.max(Isp_values) if Isp_values else None
+# Divide ISP by standard gravity
+Isp_values_divided = np.array(Isp_values) / g0
+
+# Calculate statistics
+max_isp = np.max(Isp_values_divided) if len(Isp_values_divided) > 0 else None
 if max_isp is not None:
     print("Maximum Specific Impulse (s): ", max_isp)
-    stoich_OF_Ratio_isp = OF_ratio[np.argmax(Isp_values)]
+    stoich_OF_Ratio_isp = OF_ratio[np.argmax(Isp_values_divided)]
     print("Stoichiometric O/F Ratio for Max Isp: ", stoich_OF_Ratio_isp)
-    plt.axvline(x=stoich_OF_Ratio_isp, color='black', linestyle='--', label='O/F Ratio for Max Isp')
-max_temp = np.max(temperatures) #temperature of the stoichiometric mixture ratio (which is also identified through the graph)
+
+max_temp = np.max(temperatures)
 print("Maximum Chamber Temperature (K): ", max_temp)
 stoich_OF_Ratio = OF_ratio[np.argmax(temperatures)]
 print("Stoichiometric O/F Ratio: ", stoich_OF_Ratio)
-plt.axvline(x=stoich_OF_Ratio, color='black', linestyle=':', label='Stoichiometric O/F Ratio')
 
 
 def on_pick(event):
-    ind = event.ind[0] # Get the index of the picked point
+    ind = event.ind[0]
     x_val = event.artist.get_xdata()[ind]
     y_val = event.artist.get_ydata()[ind]
     captured_output = StringIO()
-
-# Use redirect_stdout to capture the output within a 'with' block
     with redirect_stdout(captured_output):
-      print(f"User Picked O/F Ratio: ({x_val}, {y_val})")
-
-# Get the captured output as a string
+        print(f"User Picked O/F Ratio: ({x_val}, {y_val})")
     selected_of_ratio = captured_output.getvalue()
-    print(selected_of_ratio)  # Print the captured output to the console
+    print(selected_of_ratio)
 
-x = OF_ratio
-y = temperatures
-line, = plt.plot(x, y, 'o', picker=5,color = 'black',markersize = 3) # Enable picking for the points
 
+# First plot: Chamber Temperature vs O/F Ratio
+plt.figure()
+line1, = plt.plot(OF_ratio, temperatures, 'o', picker=5, color='black', markersize=4, linestyle='-')
+ax = plt.gca()
+ax.tick_params(axis='both', which='major', labelsize=22)
+plt.axvline(x=stoich_OF_Ratio, color='black', linestyle=':', linewidth=2, label='Stoichiometric O/F Ratio')
 plt.gcf().canvas.mpl_connect('pick_event', on_pick)
-
-
-
 plt.xlabel('O/F Ratio')
 plt.ylabel('Chamber Temperature (K)')
-plt.title(f'Chamber Temperature vs O/F Ratio for {Fuel_Input} and {Oxidizer_Input}')
-plt.legend()
+#plt.title(f'Chamber Temperature vs O/F Ratio for {Fuel_Input} and {Oxidizer_Input}')
+plt.legend(loc='lower right')
 plt.show()
+
+# Second plot: ISP vs O/F Ratio
+plt.figure()
+line2, = plt.plot(OF_ratio, Isp_values_divided, 'o', picker=5, color='black', markersize=4, linestyle='-')
+ax = plt.gca()
+ax.tick_params(axis='both', which='major', labelsize=22)
+plt.axvline(x=stoich_OF_Ratio_isp, color='black', linestyle='--',linewidth=2, label='O/F Ratio for Max Isp')
+plt.gcf().canvas.mpl_connect('pick_event', on_pick)
+plt.xlabel('O/F Ratio')
+plt.ylabel('Isp (s)')
+#plt.title(f'Specific Impulse vs O/F Ratio for {Fuel_Input} and {Oxidizer_Input}')
+plt.legend(loc='lower right')
+plt.show()
+
+
+
