@@ -1,7 +1,10 @@
 #based on Robert Watzlavick's regen engine sizer but makes sizing automatic based on the propellant choice, thrust, chamber pressure, and O/F ratio
 
-from CEAtoFOAM import Ae, De, Dt, L_cylindrical, Lconv, OF_Ratio, R_throat, V_chamber_new, V_cone, gamma, chamber_temp, meanMolarMass, temp_fuel, temp_oxidizer, Ac_At, Ae_At, convergent_half_angle, divergent_half_angle, L_star, Dc, Ldiv, A_t, mdot,Mach_Exit
+from xml.etree.ElementTree import PI
 
+from CEAtoFOAM import Ae, De, Dt, L_cylindrical, Lconv, OF_Ratio, R_throat, V_chamber_new, V_cone, gamma, chamber_temp, meanMolarMass, temp_fuel, temp_oxidizer, Ac_At, Ae_At, convergent_half_angle, divergent_half_angle, L_star, Dc, Ldiv, A_t, mdot,Mach_Exit
+import math
+import numpy as np
 
 OFRatio = OF_Ratio #dimensionless
 Ec = Ac_At #dimensionless (contraction ratio)
@@ -216,6 +219,7 @@ print("Prandtl Number = ", Prandtl_number_gas)
 print("Dynamic Viscosity of the Gas = ", mu_gas)
 print("Specific Heat of the Gas at Constant Pressure = ", Cp_gas_BTU, "Btu/lbm-R")
 print("Cp Fuel Avg = ", Cp_fuel_avg, "Btu/lbm-R")
+print("Effective Exhaust Velocity = ", c_star*Cf_correction_factor, "ft/s")
 print("Cp Fuel Injection = ", Cp_fuel_inj, "Btu/lbm-R")
 print("Kinematic Viscosity of Fuel (Average) = ", Kin_Visc_fuel_avg, "ft^2/s")
 print("Kinematic Viscosity of Fuel (Injection) = ", Kin_Visc_fuel_inj, "ft^2/s")
@@ -266,3 +270,52 @@ print("Wall Temperature at the chamber = ", chamber_Twc, "R")
 print("Wall Temperature at the throat = ", throat_Twc, "R")
 print("Wall Temperature at the nozzle exit = ", nozzle_Twc, "R")
 
+friction_factor_coolant_tubes = 0.030
+
+drill_bit_diameter = float(input("Enter the diameter of the drill bit used to make the cooling holes in inches: "))
+
+chamber_area = np.pi*chamber_diameter*chamber_length
+
+nozzle_area1 = np.pi*((chamber_diameter/2)+(throat_diameter/2))*((((chamber_diameter-throat_diameter)/2*np.cos(30*np.pi/180))**2+((chamber_diameter-throat_diameter)/2)**2)**0.5)
+
+nozzle_area2 =np.pi*((exit_diameter/2)+(throat_diameter/2))*np.sqrt(((exit_diameter-throat_diameter)/2*np.cos(15*np.pi/180))**2+((exit_diameter-throat_diameter)/2)**2)
+
+Tcc = 1211.67 #critical temperature of Kerosene (RP-1) in Rankine
+
+fuel_mass_flow_rate = mdot/(1+OFRatio) #lbm/s
+
+Q_max = fuel_mass_flow_rate*Cp_fuel_inj*(Tcc-tFuelAmbient) #Btu/sec
+
+qNozzle1 =(((q_throat-q_chamber)/convergent_cone_length)*((throat_diameter-chamber_diameter)/convergent_cone_length)/3*convergent_cone_length**3+((q_throat-q_chamber)/convergent_cone_length)*chamber_diameter/2*convergent_cone_length**2+((throat_diameter-chamber_diameter)/convergent_cone_length)*q_chamber/2*convergent_cone_length**2+chamber_diameter*q_chamber*convergent_cone_length)*np.pi/np.cos(np.radians(convergent_half_angle))
+
+qNozzle2 =(((q_exit-q_throat)/divergent_cone_length)*((exit_diameter-throat_diameter)/divergent_cone_length)/3*divergent_cone_length**3+((q_exit-q_throat)/divergent_cone_length)*throat_diameter/2*divergent_cone_length**2+((exit_diameter-throat_diameter)/divergent_cone_length)*q_throat/2*divergent_cone_length**2+throat_diameter*q_throat*divergent_cone_length)*np.pi/np.cos(np.radians(divergent_half_angle))
+
+print("Heat flux across converging portion of nozzle = ", qNozzle1, "Btu/s")
+print("Heat flux across diverging portion of nozzle = ", qNozzle2, "Btu/s")
+
+deltaT_coolant_channel =Q_max/(fuel_mass_flow_rate*Cp_fuel_avg)
+
+print("Temperature change across the coolant channel = ", deltaT_coolant_channel, "R")
+
+Tco = deltaT_coolant_channel+tFuelAmbient
+print("Coolant outlet temperature = ", Tco, "R")
+
+tube_Fluid_velocity =(fuel_mass_flow_rate*4)/(np.pi*drill_bit_diameter**2*(fuelDensity_Average/1728))/12
+
+print("Fluid velocity in the coolant tubes = ", tube_Fluid_velocity, "ft/s")
+
+chamberdP = friction_factor_coolant_tubes*(number_tubes*chamber_length/drill_bit_diameter)*(fuelDensity_Average*tube_Fluid_velocity**2)/(144*2*g)
+
+print("Pressure drop across the coolant channel (Chamber Section) = ", chamberdP, "psi")
+
+throatdP =friction_factor_coolant_tubes*(number_tubes*((chamber_diameter-drill_bit_diameter)/2)/np.sin(30*np.pi/180))/drill_bit_diameter*(fuelDensity_Average*tube_Fluid_velocity**2)/(144*2*g)
+
+print("Pressure drop across the coolant channel (Throat Section) = ", throatdP, "psi")
+
+nozzledP =friction_factor_coolant_tubes*(number_tubes*((exit_diameter-drill_bit_diameter)/2)/np.sin(15*np.pi/180))/drill_bit_diameter*(fuelDensity_Average*tube_Fluid_velocity**2)/(144*2*g)
+
+print("Pressure drop across the coolant channel (Nozzle Section) = ", nozzledP, "psi")
+
+totaldP = chamberdP + throatdP + nozzledP
+
+print("Total pressure drop across the coolant channel = ", totaldP, "psi")
