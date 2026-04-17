@@ -8,17 +8,26 @@ import cantera as ct
 from CEA_Wrap import Fuel, Oxidizer, RocketProblem
 import os
 
-#using RP-1 and LOX as Propellants
-#Chemical composition is not defined, thus, the program will use the default CEA values for the specified propellant
 
 Pressure_Input = float(input("Enter Chamber Pressure (PSI): "))
-Fuel_Input = input("Enter Fuel (RP-1,H2(L),CH4(L)): ")
-Oxidizer_Input = input("Enter Oxidizer (O2(L),N2O4,O2): ")
+Fuel_Input = input("Enter Fuel (RP-1,H2(L),CH4(L),CH6N2(L)): ")
+Oxidizer_Input = input("Enter Oxidizer (O2(L),N2O4,O2, N2O4(L) ): ")
 OF_Ratio = float(input("Enter O/F Ratio: "))
 Design_altitude = float(input("Enter Design Altitude (ft): "))
 altitude = Design_altitude*0.3048 #converts feet to meters
 
-
+plt.rcParams['axes.titlesize'] = 20  # Title font size
+plt.rcParams['axes.labelsize'] = 20  # Axis label font size
+plt.rcParams['xtick.labelsize'] = 16  # X-tick label font size
+plt.rcParams['ytick.labelsize'] = 16  # Y-tick label font size
+plt.rcParams['legend.fontsize'] = 14 # Legend font size
+plt.rcParams['lines.linewidth'] = 1  # Line width for plots
+plt.rcParams['lines.markersize'] = 8  # Marker size for points
+plt.rcParams['figure.figsize'] = (10, 6)  # Default figure size
+plt.rcParams['axes.grid'] = False  # Add grid to plots
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams['legend.fontsize'] = 12
+plt.rcParams['legend.loc'] = 'upper left'  # Legend location
 
 
 #AMBIENT PRESSURE CALCULATION SECTION
@@ -43,12 +52,16 @@ ambient_pressure = p0_psi
 fuel_temps = {
     "RP-1": 298.15,
     "H2(L)": 20.283,
-    "CH4(L)": 111.66
+    "CH4(L)": 111.66,
+    "CH6N2(L)": 298.15,
+    "C3H8(L)": 298.15,
+    "C3H8": 298.15,
+    "C2H5OH(L)": 298.15
 }
 
 oxidizer_temps = {
     "O2(L)": 90.170,
-    "N2O4": 294.15,
+    "N2O4(L)": 294.15,
     "O2": 298.15
 }
 
@@ -337,8 +350,9 @@ plt.plot(temRH,cpHbyR, lw=2,color = 'black',linestyle='--')
 
 plt.xlabel('Temperature (K)')
 plt.ylabel('$C_p$ [J/kg/K]')
-plt.grid(color='black', alpha=0.5, linewidth=0.5)
-
+#plt.grid(color='black', alpha=0.5, linewidth=0.5)
+#plt.legend()
+#plt.title(f"Cp vs T for {Fuel_Input}/{Oxidizer_Input} Propellant Combination"  )
 #plt.savefig("cp_vs_T.png")
 plt.show()
 
@@ -361,8 +375,7 @@ plt.plot(temRH, cpH, lw=2, label='Cp (high range)', color = 'black',linestyle='-
 plt.xlabel('Temperature (K)')
 plt.ylabel('Cp [J/kg/K]')
 plt.title('Cp vs T')
-plt.grid(alpha=0.4)
-plt.legend()
+#plt.grid(alpha=0.4)
 
 plt.subplot(1,2,2)
 plt.plot(temRL, cpL_divR, lw=2, label='Cp/R (low range)', color = 'black')
@@ -371,6 +384,7 @@ plt.xlabel('Temperature (K)')
 plt.ylabel('Cp / R')
 plt.title('Cp/R vs T')
 plt.grid(alpha=0.4)
+
 plt.legend()
 
 plt.tight_layout()
@@ -434,10 +448,7 @@ Ae_At = (1.0 / Mach_Exit) * ((2.0 / (gamma + 1.0)) * (1.0 + ((gamma - 1.0) / 2.0
 
 
 Ae = Ae_At * A_star
- 
-Pe = P1 * (1.0 + ((gamma - 1.0) / 2.0) * Mach_Exit ** 2) ** (-gamma / (gamma - 1.0))
- 
-Ve = np.sqrt((2.0 * gamma * R * T1) / (gamma - 1.0) * (1.0 - (Pe / P1) ** ((gamma - 1.0) / gamma)))
+  
  
 Dt = 2*np.sqrt(A_t/np.pi)
 De = 2*np.sqrt(Ae/np.pi)
@@ -448,27 +459,30 @@ Re = De/2
 Dt_cm = Dt*100
 
 Ec = Ac_At = (8*(Dt_cm)**-0.6)+1.25
+
+#value for L_star is computed in meters from Huzel and Huang Pg. 72 in Modern Engineering for Design of Liquid-Propellant Rocket Engines
 L_star_print_out = """
-Propellant Combination | L* (inches)
+            Propellant Combination              | L* (inches)
 ------------------------------------------------|----------------
-Chlorine trifluoride/hydrazine-base fuel | 20-35
-Liquid fluorine/hydrazine | 24-28
+Chlorine trifluoride/hydrazine-base fuel        | 20-35
+Liquid fluorine/hydrazine                       | 24-28
 Liquid fluorine/liquid hydrogen (GH2 injection) | 22-26
 Liquid fluorine/liquid hydrogen (LH2 injection) | 25-30
 Hydrogen peroxide/RP-1 (including catalyst bed) | 60-70
-Nitric acid/hydrazine-base fuel | 30-35
-Nitrogen tetroxide/hydrazine-base fuel | 30-35
-Liquid oxygen/ammonia | 30-40
-Liquid oxygen/liquid hydrogen (GH2 injection) | 22-28
-Liquid oxygen/liquid hydrogen (LH2 injection) | 30-40
-Liquid oxygen/RP-1 | 40-50
+Nitric acid/hydrazine-base fuel                 | 30-35
+Nitrogen tetroxide/hydrazine-base fuel          | 30-35
+Liquid oxygen/ammonia                           | 30-40
+Liquid oxygen/liquid hydrogen (GH2 injection)   | 22-28
+Liquid oxygen/liquid hydrogen (LH2 injection)   | 30-40
+Liquid oxygen/RP-1                              | 40-50
 """
 print(L_star_print_out)
 
-
 L_star = float(input("Enter L* value (in inches): "))
-L_star = L_star * 0.0254 # convert inches to meters
+L_star = L_star * 0.0254  # convert inches to meters
 V_chamber = L_star * A_t
+
+Ac = Ac_At * A_t
 
 Dc = 2*np.sqrt(Ac/np.pi)
 Rc = Dc/2
@@ -522,6 +536,7 @@ print("Chamber Volume (m^3): {:.4f}".format(V_chamber_new))
 print(f"Radius of Curvature at Throat (m): {float(R_throat)}")
 print(f"Chamber Temperature (K): {float(T1)}")
 print(f"Total Engine Length (m): {float(total_engine_length)}")
+print(f"Length of Engine Until Throat (m): {float(L_cylindrical + Lconv)}")
 
 
 def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
@@ -581,8 +596,6 @@ def plot_nozzle_contour_piecewise(savefile='nozzle_contour.png'):
 
 # replace call to previous plot function with this one
 plot_nozzle_contour_piecewise()
-
-
 
 
 
