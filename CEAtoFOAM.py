@@ -448,11 +448,27 @@ Re = De/2
 Dt_cm = Dt*100
 
 Ec = Ac_At = (8*(Dt_cm)**-0.6)+1.25
+L_star_print_out = """
+Propellant Combination | L* (inches)
+------------------------------------------------|----------------
+Chlorine trifluoride/hydrazine-base fuel | 20-35
+Liquid fluorine/hydrazine | 24-28
+Liquid fluorine/liquid hydrogen (GH2 injection) | 22-26
+Liquid fluorine/liquid hydrogen (LH2 injection) | 25-30
+Hydrogen peroxide/RP-1 (including catalyst bed) | 60-70
+Nitric acid/hydrazine-base fuel | 30-35
+Nitrogen tetroxide/hydrazine-base fuel | 30-35
+Liquid oxygen/ammonia | 30-40
+Liquid oxygen/liquid hydrogen (GH2 injection) | 22-28
+Liquid oxygen/liquid hydrogen (LH2 injection) | 30-40
+Liquid oxygen/RP-1 | 40-50
+"""
+print(L_star_print_out)
 
-L_star = 1.2
+
+L_star = float(input("Enter L* value (in inches): "))
+L_star = L_star * 0.0254 # convert inches to meters
 V_chamber = L_star * A_t
-
-Ac = Ac_At * A_t
 
 Dc = 2*np.sqrt(Ac/np.pi)
 Rc = Dc/2
