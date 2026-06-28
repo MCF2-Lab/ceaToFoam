@@ -1,5 +1,5 @@
 
-from CEAtoFOAM import a_sound, gamma, T1, Tamb, p0, P1, meanMolarMass, Tlow, Thigh, Tcommon, Hcof, Lcof, high_enthalpy_offset, high_entropy_offset, low_enthalpy_offset, low_entropy_offset, L_cylindrical, Rc, Rt, R_throat, Re, Lconv, Ldiv, convergent_half_angle, divergent_half_angle
+from ceaToFoam import a_sound, gamma, T1, Tamb, p0, P1, meanMolarMass, Tlow, Thigh, Tcommon, Hcof, Lcof, high_enthalpy_offset, high_entropy_offset, low_enthalpy_offset, low_entropy_offset, L_cylindrical, Rc, Rt, R_throat, Re, Lconv, Ldiv, convergent_half_angle, divergent_half_angle
 import os
 import shutil
 import numpy as np
@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 import io
 
-#Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
+##Asssuming a Mach number of 0.1 in the chamber for the velocity input and finding the velocity at the inlet by multiplying the speed of sound by this Mach.
 VELOCITY_INPUT = 0.1*a_sound
 U = "U.txt"
 U_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
@@ -68,8 +68,8 @@ boundaryField
 // ************************************************************************* //'''
 
 GAMMA_INPUT = str(gamma)
-U_text = U_text.replace("XVEL", str(VELOCITY_INPUT)) #replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
-U_text = U_text.replace("GAMMA_VAL", GAMMA_INPUT) #replaces the GAMMA_VAL in the U file with the user inputted value for the gamma
+U_text = U_text.replace("XVEL", str(VELOCITY_INPUT)) ##replaces the XVEL in the U file with the user inputted value for the velocity in the x-direction
+U_text = U_text.replace("GAMMA_VAL", GAMMA_INPUT) ##replaces the GAMMA_VAL in the U file with the user inputted value for the gamma
 
 U_file = open(U, 'w')
 U_file.write(U_text)
@@ -77,7 +77,7 @@ U_file.close()
 
 
 TEMPERATURE_INPUT = str(T1)
-TEMPERATURE_AMBIENT = str(Tamb + 273.15) #converts the ambient temperature from Celsius to Kelvin
+TEMPERATURE_AMBIENT = str(Tamb + 273.15) ##converts the ambient temperature from Celsius to Kelvin
 T = "T.txt"
 T_text = r'''/*--------------------------------*- C++ -*----------------------------------*\
 | =========                 |                                                 |
@@ -145,9 +145,9 @@ boundaryField
 
 // ************************************************************************* //'''
 
-T_text = T_text.replace("T_VAL", TEMPERATURE_INPUT) #replaces the TVAL in the T file with the user inputted value for the temperature
-T_text = T_text.replace("T_AMBIENT", TEMPERATURE_AMBIENT) #replaces the T_AMBIENT in the T file with the user inputted value for the ambient temperature
-T_text = T_text.replace("GAMMA_VAL", GAMMA_INPUT) #replaces the GAMMA_VAL in the T file with the user inputted value for the gamma
+T_text = T_text.replace("T_VAL", TEMPERATURE_INPUT) ##replaces the TVAL in the T file with the user inputted value for the temperature
+T_text = T_text.replace("T_AMBIENT", TEMPERATURE_AMBIENT) ##replaces the T_AMBIENT in the T file with the user inputted value for the ambient temperature
+T_text = T_text.replace("GAMMA_VAL", GAMMA_INPUT) ##replaces the GAMMA_VAL in the T file with the user inputted value for the gamma
 
 T_file = open(T, 'w')
 T_file.write(T_text)
@@ -512,7 +512,7 @@ replacements = {"AMB_PRESSURE": ambient_pressure_str,
                 "P_VAL": str(P1),
                 "GAMMA_VAL": GAMMA_INPUT
 }
-for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+for old, new in replacements.items(): ##this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
      pressure_text = pressure_text.replace(old, new)
  
 pressure_file = open(pressure, 'w')
@@ -598,7 +598,7 @@ print(replacements_tpp)
 
 
 
-for old, new in replacements_tpp.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+for old, new in replacements_tpp.items(): ##this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
     tpp_text = tpp_text.replace(old, new)
 
 thermo_file = open(thermophysicalProperties, 'w')
@@ -901,32 +901,28 @@ decomposePar_file = open(decomposePar, 'w')
 decomposePar_file.write(decomposePar_text)
 decomposePar_file.close()
 
+comb_r=Rc ##radius of combustion chamber
+comb_l=L_cylindrical ##straight length of combustion chamber
+comb_r1=0.001## curvature radius of combustion chamber tapering
+comb_half_angle= convergent_half_angle##half angle of the combustion chamber tapering
+throat_r=Rt ## radius at the nozzle
+comb_full_l=L_cylindrical+Lconv ##length of combustion chamber till throat
+throat_curv_r=R_throat ## curvature radius at the nozzle throat
+div_half_angle_1=divergent_half_angle ##half angle of the diverging section
+straight_1=0.001 ## first transitional straight section
+div_r = 0  ##no bell curvature for a purely conical nozzle
+straight_2=0.0014 ##straight section at the nozzle exit
+div_half_angle_2=div_half_angle_1 ##half angle of the diverging section at the termination
+total_l=(L_cylindrical+Lconv+Ldiv) ##total length of the engine
+bell_r=Re ##radius of the nozzle bell at the rim
+domain_r=10*bell_r ##radius of the area behind the nozzle for the plume
+domain_ext=1.5*total_l+6 ##extra length for the plume
+wedge_half_angle=2.5 ##half angle to create a wedge
 
+points = np.zeros((31, 3)) ##main blockmesh vertices
+aux_points = np.zeros((6, 3)) ##auxiliary points to specify arc segments
 
-
-
-comb_r=Rc # radius of combustion chamber
-comb_l=L_cylindrical # straight length of combustion chamber
-comb_r1=0.01# curvature radius of combustion chamber tapering
-comb_half_angle= 30# half angle of the combustion chamber tapering
-throat_r=Rt # radius at the nozzle
-comb_full_l=L_cylindrical+Lconv # length of combustion chamber till throat
-throat_curv_r=R_throat # curvature radius at the nozzle throat
-div_half_angle_1=15 # half angle of the diverging section
-straight_1=0.01 # first transitional straight section
-div_r = 0  # no bell curvature for a purely conical nozzle
-straight_2=0.014 # straight section at the nozzle exit
-div_half_angle_2=div_half_angle_1 # half angle of the diverging section at the termination
-total_l=(L_cylindrical+Lconv+Ldiv) # total length of the engine
-bell_r=Re # radius of the nozzle bell at the rim
-domain_r=9*bell_r # radius of the area behind the nozzle for the plume
-domain_ext=1.5*total_l+10 # extra length for the plume
-wedge_half_angle=2.5 # half angle to create a wedge
-
-points = np.zeros((31, 3)) # main blockmesh vertices
-aux_points = np.zeros((6, 3)) # auxiliary points to specify arc segments
-
-# points 0-8 are placed on the wedge axis
+##points 0-8 are placed on the wedge axis
 
 points[0]=(0,0,0)
 points[1]=(comb_l,0,0)
@@ -966,21 +962,21 @@ plt.plot([points[18,0],points[19,0],points[8,0]], [points[18,1],points[19,1],poi
 #plt.plot(points[0:9,0], points[0:9,1])
 
 plt.title(f'geometry with colors representing boundary condition zones')
-plt.xlim(left=-0.1)                # set up lower y-axis limit at zero
+plt.xlim(left=-0.1)                ##set up lower y-axis limit at zero
 plt.xlim(right=10)
-                   # set upper limit of the graph at 110% of maximum beam radius
+                   ##set upper limit of the graph at 110% of maximum beam radius
 plt.xlabel('Distance, [m]')
 plt.ylabel('Radius, [m]')
 
 
 #plt.savefig('Rothe_nozzle_profile.png', dpi=300)
 
-# arc central point in combustion chamber
+##arc central point in combustion chamber
 aux_points[0]=(comb_l+comb_r1*(math.sin(math.pi*comb_half_angle/360)),comb_r-comb_r1*(1-math.cos(math.pi*comb_half_angle/360)), 0)
-#arc central point in the throat
+##arc central point in the throat
 aux_points[1]=(comb_full_l,throat_r, 0)
 
-# arc central point in the diverging bell - only if a bell arc is requested
+##arc central point in the diverging bell - only if a bell arc is requested
 if div_r is not None and div_r > 0:
     midangle = (div_half_angle_1 + div_half_angle_2) / 2.0
     x_center = points[14, 0] + div_r * math.sin(math.pi * div_half_angle_1 / 180.0)
@@ -988,16 +984,16 @@ if div_r is not None and div_r > 0:
     aux_points[2] = (x_center - div_r * math.sin(math.pi * midangle / 180.0),
                      y_center + div_r * math.cos(math.pi * midangle / 180.0), 0)
 else:
-    # no bell arc for pure cone
+    ##no bell arc for pure cone
     aux_points[2] = (math.nan, math.nan, 0)
 
 #plt.scatter(aux_points[0:3,0], aux_points[0:3,1])
 plt.show()
 
-captured_output = io.StringIO()  # Create a StringIO object to capture the output
+captured_output = io.StringIO()  ##Create a StringIO object to capture the output
 
 
-# convert points to wedge
+## convert points to wedge
 
 def rotate_points(points,angle):
     for point in points:
@@ -1005,7 +1001,7 @@ def rotate_points(points,angle):
         point[2]=point[1]*math.sin(math.pi*angle/180)
     return points
 
-# generate main and aux wedge points by rotation
+##generate main and aux wedge points by rotation
 points[20:31]=rotate_points(points[9:20],-1*wedge_half_angle )
 points[9:20]=rotate_points(points[9:20],wedge_half_angle )
 aux_points[3:6]=rotate_points(aux_points[0:3],-1*wedge_half_angle )
@@ -1017,32 +1013,32 @@ print("(")
 vertices_lines = []
 for i, Point in enumerate(points):
     line = f"\t({Point[0]} {Point[1]} {Point[2]}) // {i} "
-    print(line)                     # keep console output
+    print(line)                     ##keep console output
     vertices_lines.append(line)
 
 print(");")
 
-# now create the vertices_text used in replacements
+##now create the vertices_text used in replacements
 vertices_text = "\n".join(vertices_lines)
 
 
-axis_point_numbers=np.arange(0,9) #  poit numbers on the axis
-wedge_point_numbers_1=np.arange(9,20) #  point numbers on the first wedge
-wedge_point_numbers_2=np.arange(20,31) #  point numbers on the second wedge
-# number of generated blocks
+axis_point_numbers=np.arange(0,9) ##poit numbers on the axis
+wedge_point_numbers_1=np.arange(9,20) ## point numbers on the first wedge
+wedge_point_numbers_2=np.arange(20,31) ##point numbers on the second wedge
+##number of generated blocks
 n_blocks=7
 
-# define function that creates pseudo 4-point cross-sections for the main engine part
+## define function that creates pseudo 4-point cross-sections for the main engine part
 def contour(i):
     return [axis_point_numbers[i], wedge_point_numbers_2[i], wedge_point_numbers_1[i], axis_point_numbers[i]]
 
-contours=[contour(i) for i in range(n_blocks+1)] #  define list of contours
-blocks=[contours[i]+contours[i+1] for i in range(7)] #define list of blocks
+contours=[contour(i) for i in range(n_blocks+1)] ##define list of contours
+blocks=[contours[i]+contours[i+1] for i in range(7)] ##define list of blocks
 
-y_cells=[20 for i in range(n_blocks)] # define list of cell numbers in y-direction  (uniform)
-x_cells=[int((points[i+1,0]-points[i,0])/0.005+1) for i in range(n_blocks)] # define list of cell numbers in x-direction  (every 5 mm)
+y_cells=[20 for i in range(n_blocks)] ##define list of cell numbers in y-direction  (uniform)
+x_cells=[int((points[i+1,0]-points[i,0])/0.005+1) for i in range(n_blocks)] ##define list of cell numbers in x-direction  (every 5 mm)
 
-# generate block section of blockmeshdict
+##generate block section of blockmeshdict
 print("blocks")
 print("(")
 
@@ -1057,9 +1053,9 @@ for i,block in enumerate(blocks):
         
 
 
-# number of generated blocks
+##number of generated blocks
 
-# generate asym1 surfaces for wedge BC
+##generate asym1 surfaces for wedge BC
 asym1=[[contours[i][0],contours[i][2],contours[i+1][2],contours[i+1][0]] for i in range(n_blocks) ]
 print (f'asym1 patches')
 
@@ -1070,7 +1066,7 @@ for patch in asym1:
     asym_text22.append(asym1_text)
     asym1_text2 = "\n".join(asym_text22)
 
-# generate asym2 surfaces for wedge BC
+##generate asym2 surfaces for wedge BC
 
 asym2=[[contours[i+1][0],contours[i+1][1],contours[i][1],contours[i][0]] for i in range(n_blocks) ]
 print (f'asym2 patches')
@@ -1081,8 +1077,8 @@ for patch in asym2:
     asym_text.append(asym_text2)
     asym2_text = "\n".join(asym_text)
     
-# generate nozzle surfaces for nozzle wall BC
-#nozzle[i]=np.array((wedges[i,2],wedges[i,1], wedges[i+1,1], wedges[i+1,2]))
+##generate nozzle surfaces for nozzle wall BC
+##nozzle[i]=np.array((wedges[i,2],wedges[i,1], wedges[i+1,1], wedges[i+1,2]))
 nozzle_text = []
 nozzle=[[contours[i][2],contours[i][1],contours[i+1][1],contours[i+1][2]] for i in range(n_blocks) ]
 print (f'nozzle patches')
@@ -1092,7 +1088,7 @@ for patch in nozzle:
     nozzle_text.append(nozzle2)
     nozzle_text2 = "\n".join(nozzle_text)
 
-# generate inlet surfaces for inlet BC
+##generate inlet surfaces for inlet BC
 print (f'inlet patch')
 inlet=contours[0]
 inlet_text = []
@@ -1112,7 +1108,7 @@ print(
 """
 )
 
-# generate outlet surfaces for outlet BC
+##generate outlet surfaces for outlet BC
 
 print (f'outlet patch')
 outlet=contours[n_blocks]
@@ -1145,16 +1141,16 @@ edge2_text2 = "\n".join(edge2_text)
 
 
 if div_r is not None and div_r > 0:
-    """
-    Prints the arc segment for the nozzle extension bell if div_r is specified by the user based on their bell geometry
-    """
+    
+    ##Prints the arc segment for the nozzle extension bell if div_r is specified by the user based on their bell geometry
+    
     print(f'\t arc 14 15 ({aux_points[2,0]} {aux_points[2,1]} {aux_points[2,2]})')
     #edge5_text = captured_output.getvalue()
 
 
-"""
-Prints the arc segments at the throat section of the nozzle
-"""
+
+##Prints the arc segments at the throat section of the nozzle
+
 edge3_2 = (f'\t arc 21 22 ({aux_points[3,0]} {aux_points[3,1]} {aux_points[3,2]})')
 edge3_text.append(edge3_2)
 edge3_text2 = "\n".join(edge3_text)
@@ -1301,7 +1297,7 @@ replacements = {"VERT_TEXT": vertices_text,
                 "NOZZLE_TEXT": str(nozzle_text2)
 
 }
-for old, new in replacements.items(): #this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
+for old, new in replacements.items(): ##this replaces the ambient pressure and chamber pressure specified by the user into the pressure file for OpenFOAM
     blockMeshDict_text = blockMeshDict_text.replace(old, new)
 
 block_file = open(blockMeshDict, 'w')
@@ -1312,13 +1308,13 @@ block_file.close()
 
 folder_name = input("Name your OpenFOAM case: ")
 
-# Creating the folder for the OpenFOAM case and placing all files in the correct directory for export
+##Creating the folder for the OpenFOAM case and placing all files in the correct directory for export
 os.makedirs(folder_name, exist_ok=True)
 os.makedirs(f"{folder_name}/0", exist_ok=True)
 os.makedirs(f"{folder_name}/constant", exist_ok=True)
 os.makedirs(f"{folder_name}/system", exist_ok=True)
 
-# Move files before changing directory, removing .txt extension
+##Move files before changing directory, removing .txt extension
 for filename in ["U.txt", "T.txt", "alphat.txt", "epsilon.txt", "k.txt", "nut.txt", "p.txt"]:
     new_name = os.path.splitext(filename)[0]  # Removes .txt
     shutil.move(filename, os.path.join(folder_name, "0", new_name))
