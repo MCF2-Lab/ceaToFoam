@@ -1,0 +1,65 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2412                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    arch        "LSB;label=32;scalar=64";
+    class       volScalarField;
+    location    "0";
+    object      T;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 1 0 0 0];
+
+internalField   uniform 288.19;
+boundaryField
+{
+    outlet
+    {
+        type            waveTransmissive;
+        gamma           1.148;
+        fieldInf        288.19;
+        lInf            10;
+        value           uniform 288.19;
+    }
+    inlet
+    {
+        type         totalTemperature;
+	    gamma        1.148;
+        T0           uniform 3642.95;
+	    value	     uniform 3642.95;
+    }
+    nozzle
+    {
+        type            zeroGradient;
+    }
+    asym2
+    {
+        type            wedge;
+        
+    }
+    asym1
+    {
+        type            wedge;
+        
+    }
+
+    outlet_r
+    {
+        type            waveTransmissive;
+        gamma           1.148;
+        fieldInf        288.19;
+        lInf            10;
+        value           uniform 288.19;
+    }
+}
+
+
+// ************************************************************************* //
