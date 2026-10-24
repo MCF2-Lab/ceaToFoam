@@ -161,8 +161,8 @@ def main(argv=None):
 
     p = sub.add_parser("post", help="evaluate a finished case")
     p.add_argument("case_dir")
-    p.add_argument("--window", type=float, default=0.1,
-                   help="fraction of iterations averaged (default 0.1)")
+    p.add_argument("--window", type=float, default=0.25,
+                   help="fraction of iterations averaged (default 0.25)")
     p.set_defaults(func=cmd_post)
 
     p = sub.add_parser("sweep", help="CEA over a range of O/F")

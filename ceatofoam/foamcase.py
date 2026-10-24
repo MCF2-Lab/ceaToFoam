@@ -10,9 +10,12 @@ inviscid; slip walls), ``laminar`` and ``kOmegaSST`` (wall functions).
 
 The case runs to steady state with local time stepping (localEuler; time is
 the iteration count) from the 1-D frozen solution inside the chamber
-(setFields) and ambient gas at rest in the plume. Exit-plane integrals are recorded by function objects
-on the faceZone ``exit`` (created by topoSet) and the wall force on the
-patch ``nozzle``; ceatofoam.post turns them into thrust and mass flow.
+(setFields), a column of exit-state gas behind the exit and ambient gas at
+rest elsewhere. By default the domain ends at the nozzle exit (supersonic
+outflow); with a plume region the exit plane is the faceZone ``exit``
+(topoSet). Exit-plane integrals, the injector-face and throat mass flow and
+the wall force on the patch ``nozzle`` are recorded by function objects;
+ceatofoam.post turns them into thrust and mass flow.
 """
 
 from dataclasses import dataclass
@@ -34,6 +37,7 @@ class SolverSettings:
     turbulence_intensity: float = 0.05
     mixing_length: float = 0.07   # times the chamber diameter
     n_procs: int = 1
+    inlet_velocity_bc: str = "zeroGradient"   # or pressureInletOutletVelocity
 
 
 @dataclass
@@ -57,6 +61,9 @@ class CaseConditions:
     initial_slices: list
     x_end: float
     wall_points: list
+    initial_jet: tuple       # (p, T, u) of the 1-D exit state
+    plume: bool              # mesh has the plume region behind the exit
+    x_inlet: float           # axial position of the inlet patch
 
 
 def _thermophysical(c, model):
@@ -146,15 +153,12 @@ def _p(c):
     {{
         type            zeroGradient;
     }}
+    // Supersonic outflow at the exit plane (no plume) or through the jet
+    // core (plume). waveTransmissive failed at the plume outlet with local
+    // time stepping in tests; extrapolation is stable.
     outlet
     {{
-        type            waveTransmissive;
-        field           p;
-        psi             thermo:psi;
-        gamma           {fmt(c.gamma_amb)};
-        fieldInf        {fmt(c.p_amb)};
-        lInf            {fmt(4*c.re)};
-        value           uniform {fmt(c.p_amb)};
+        type            zeroGradient;
     }}
     farfield
     {{
@@ -168,6 +172,9 @@ def _p(c):
 
 
 def _T(c):
+    # Initial face value at the outlet: the 1-D exit state when the domain
+    # ends at the exit (setFields sets cells only).
+    t_out = c.t_amb if c.plume else c.initial_jet[1]
     return _field("[0 0 0 1 0 0 0]", fmt(c.t_amb), f"""    inlet
     {{
         type            totalTemperature;
@@ -184,24 +191,24 @@ def _T(c):
     {{
         type            inletOutlet;
         inletValue      uniform {fmt(c.t_amb)};
-        value           uniform {fmt(c.t_amb)};
+        value           uniform {fmt(t_out)};
     }}
     farfield
     {{
-        type            totalTemperature;
-        T0              uniform {fmt(c.t_amb)};
-        psi             thermo:psi;
-        gamma           {fmt(c.gamma_amb)};
+        type            inletOutlet;
+        inletValue      uniform {fmt(c.t_amb)};
         value           uniform {fmt(c.t_amb)};
     }}
 """)
 
 
-def _U(model):
+def _U(c, model, inlet_bc):
     wall = "slip" if model == "inviscid" else "noSlip"
+    u_out = 0.0 if c.plume else c.initial_jet[2]
     return _field("[0 1 -1 0 0 0 0]", "(0 0 0)", f"""    inlet
     {{
-        type            zeroGradient;
+        type            {inlet_bc};
+        value           uniform (0 0 0);
     }}
     "(nozzle|base)"
     {{
@@ -211,7 +218,7 @@ def _U(model):
     {{
         type            inletOutlet;
         inletValue      uniform (0 0 0);
-        value           uniform (0 0 0);
+        value           uniform ({fmt(u_out)} 0 0);
     }}
     farfield
     {{
@@ -311,6 +318,11 @@ def _control_dict(c, s):
     wall = "\n".join(
         f"                    ({fmt(x)} {fmt(r)} 0)" for x, r in c.wall_points
     )
+    # The exit plane is the faceZone exit (topoSet) inside a plume domain,
+    # or the outlet patch when the domain ends at the exit.
+    exit_region, exit_name = (
+        ("faceZone", "exit") if c.plume else ("patch", "outlet")
+    )
     return f"""application     rhoCentralFoam;
 
 startFrom       latestTime;
@@ -336,6 +348,19 @@ runTimeModifiable true;
 
 functions
 {{
+    // Extremes of T and p with their locations (diagnostics).
+    minMax
+    {{
+        type            fieldMinMax;
+        libs            (fieldFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   10;
+        log             false;
+        location        true;
+        mode            magnitude;
+        fields          (T p);
+    }}
+
     MachNo
     {{
         type            MachNo;
@@ -391,20 +416,20 @@ functions
     exitFlux
     {{
         $inletFlux;
-        regionType      faceZone;
-        name            exit;
+        regionType      {exit_region};
+        name            {exit_name};
     }}
     exitPressure
     {{
         $inletPressure;
-        regionType      faceZone;
-        name            exit;
+        regionType      {exit_region};
+        name            {exit_name};
     }}
     exitMomentum
     {{
         $inletMomentum;
-        regionType      faceZone;
-        name            exit;
+        regionType      {exit_region};
+        name            {exit_name};
     }}
     exitAverage
     {{
@@ -414,8 +439,8 @@ functions
         writeInterval   10;
         log             false;
         writeFields     false;
-        regionType      faceZone;
-        name            exit;
+        regionType      {exit_region};
+        name            {exit_name};
         operation       areaAverage;
         fields          (p T Ma);
     }}
@@ -436,7 +461,7 @@ functions
             {{
                 type        uniform;
                 axis        x;
-                start       (0 {fmt(1e-3*c.re)} 0);
+                start       ({fmt(c.x_inlet)} {fmt(1e-3*c.re)} 0);
                 end         ({fmt(c.x_end)} {fmt(1e-3*c.re)} 0);
                 nPoints     400;
             }}
@@ -502,6 +527,8 @@ functions
 
 def _fv_schemes(s):
     lim = s.limiter
+    # Limited schemes have a vector form (vanLeerV, MinmodV); upwind has not.
+    lim_v = lim if lim in ("upwind", "linear") else f"{lim}V"
     turb = ""
     if s.model == "kOmegaSST":
         turb = """    div(phi,k)      Gauss upwind;
@@ -535,7 +562,7 @@ interpolationSchemes
 {{
     default         linear;
     reconstruct(rho) {lim};
-    reconstruct(U)  {lim}V;
+    reconstruct(U)  {lim_v};
     reconstruct(T)  {lim};
 }}
 
@@ -619,6 +646,24 @@ def _set_fields(c):
             volVectorFieldValue U ({fmt(u)} 0 0)
         );
     }}""")
+    # The jet is started as a column of exit-state gas downstream of the
+    # exit: an impulsive start into still gas rolls up a starting vortex
+    # whose low-pressure core reached the farfield boundary and failed
+    # there (tests with a 3 r_e farfield, iteration ~3900).
+    pj, tj, uj = c.initial_jet
+    if c.plume:
+        regions.append(f"""    cylinderToCell
+    {{
+        point1 ({fmt(c.x_exit)} 0 0);
+        point2 ({fmt(c.x_end + 1.0)} 0 0);
+        radius {fmt(c.re)};
+        fieldValues
+        (
+            volScalarFieldValue p {fmt(pj)}
+            volScalarFieldValue T {fmt(tj)}
+            volVectorFieldValue U ({fmt(uj)} 0 0)
+        );
+    }}""")
     return f"""defaultFieldValues
 (
     volScalarFieldValue p {fmt(c.p_amb)}
@@ -641,6 +686,7 @@ _ALLRUN = """#!/bin/sh
 cd "${0%/*}" || exit 1
 . ${WM_PROJECT_DIR:?}/bin/tools/RunFunctions
 
+restore0Dir
 runApplication blockMesh
 runApplication checkMesh
 runApplication topoSet
@@ -658,7 +704,7 @@ fi
 _ALLCLEAN = """#!/bin/sh
 cd "${0%/*}" || exit 1
 . ${WM_PROJECT_DIR:?}/bin/tools/CleanFunctions
-cleanCase
+cleanCase0
 """
 
 
@@ -669,12 +715,13 @@ def write_case(case, conditions, solver):
           _thermophysical(c, s.model))
     write(case, "constant/turbulenceProperties", "dictionary",
           _turbulence_properties(s.model))
-    write(case, "0/p", "volScalarField", _p(c))
-    write(case, "0/T", "volScalarField", _T(c))
-    write(case, "0/U", "volVectorField", _U(s.model))
+    write(case, "0.orig/p", "volScalarField", _p(c))
+    write(case, "0.orig/T", "volScalarField", _T(c))
+    write(case, "0.orig/U", "volVectorField",
+          _U(c, s.model, s.inlet_velocity_bc))
     if s.model == "kOmegaSST":
         for name, body in _turbulence_fields(c, s).items():
-            write(case, f"0/{name}", "volScalarField", body)
+            write(case, f"0.orig/{name}", "volScalarField", body)
     write(case, "system/controlDict", "dictionary", _control_dict(c, s))
     write(case, "system/fvSchemes", "dictionary", _fv_schemes(s))
     write(case, "system/fvSolution", "dictionary", _FV_SOLUTION)

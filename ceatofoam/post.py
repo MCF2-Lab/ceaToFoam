@@ -11,9 +11,10 @@ Thrust is evaluated in two ways:
   face minus the axial force of the gas on the wall.
 
 Both are equal if axial momentum is conserved, so their difference measures
-the momentum budget closure of the discretization. Steadiness is the
-relative range of the exit mass flow and thrust over the last
-``window`` fraction of the iterations.
+the momentum budget closure of the discretization. Results are means over
+the last ``window`` fraction of the iterations; their relative range
+(steadiness) and relative standard deviation (iterative uncertainty) are
+reported with them.
 """
 
 import json
@@ -61,7 +62,7 @@ def _series(case, fo, filename="surfaceFieldValue.dat"):
     return data
 
 
-def evaluate(case, window=0.1):
+def evaluate(case, window=0.25):
     with open(os.path.join(case, "ceatofoam.json")) as f:
         rec = json.load(f)
     p_amb = rec["ambient"]["p"]
@@ -95,14 +96,16 @@ def evaluate(case, window=0.1):
     last = it >= it[-1]*(1 - window)
 
     def stat(a):
+        """Mean, relative range and relative standard deviation."""
         a = a[last]
         mean = float(np.mean(a))
-        return mean, float((np.max(a) - np.min(a))/abs(mean))
+        return (mean, float((np.max(a) - np.min(a))/abs(mean)),
+                float(np.std(a)/abs(mean)))
 
-    mdot, mdot_var = stat(mdot_e)
-    thrust, thrust_var = stat(f_exit)
-    mdot_in, _ = stat(mdot_i)
-    budget, _ = stat(f_budget)
+    mdot, mdot_var, mdot_std = stat(mdot_e)
+    thrust, thrust_var, thrust_std = stat(f_exit)
+    mdot_in, _, _ = stat(mdot_i)
+    budget, _, _ = stat(f_budget)
     j = min(len(avg_e), n) - 1
     design = rec["design"]
     try:
@@ -128,6 +131,9 @@ def evaluate(case, window=0.1):
         "mach_e_mean": float(avg_e[j, 3]),
         "steadiness_mdot": mdot_var,
         "steadiness_thrust": thrust_var,
+        # Iterative uncertainty: relative standard deviation in the window.
+        "iterative_std_mdot": mdot_std,
+        "iterative_std_thrust": thrust_std,
         # Injector-face mass flow: it settles first; equal to the exit and
         # throat values once mdot_balance is small.
         "discharge_coefficient": mdot_in/rec["mdot_ideal"],
@@ -148,7 +154,7 @@ def evaluate(case, window=0.1):
     return result
 
 
-def write(case, window=0.1):
+def write(case, window=0.25):
     result = evaluate(case, window)
     with open(os.path.join(case, "results.json"), "w") as f:
         json.dump(result, f, indent=2)

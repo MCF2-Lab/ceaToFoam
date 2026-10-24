@@ -85,7 +85,8 @@ mesh:
   radial_cells: 40      # axis to wall
   cell_aspect: 1.0      # axial/radial cell size
   scale: 1.0            # multiplies every count (mesh studies)
-  plume_length: 4       # exit diameters
+  include_cylinder: false
+  plume_length: 0       # exit diameters; 0: domain ends at the exit
   plume_radius: 3       # exit radii
 solver:
   model: kOmegaSST      # inviscid | laminar | kOmegaSST
@@ -103,17 +104,26 @@ explicitly (`throat_radius`, `area_ratio`, `contraction_ratio`,
 * Thermophysics: `hePsiThermo`, `pureMixture`, `sutherland`, `janaf`,
   `perfectGas`, `sensibleInternalEnergy`. One pseudo-species: the frozen
   chamber mixture, which also fills the ambient region.
-* Mesh: wedge of 5 degrees, symmetric about the x-y plane; patches `inlet`
-  (injector face), `nozzle` and `base` (walls), `outlet`, `farfield`,
-  `front`, `back`.
-* Boundary conditions: total pressure and temperature at the injector
-  face, adiabatic walls, wave-transmissive outlet, total-pressure
-  entrainment boundary.
+* Domain: from the end of the cylindrical chamber to the nozzle exit. In
+  a steady frozen flow the cylinder is a duct at constant total
+  conditions, and its low Mach number slows the density-based solver;
+  `include_cylinder: true` meshes it anyway, and `plume_length` > 0 adds a
+  plume region behind the exit (for flow pictures; thrust and mass flow
+  need only the exit plane).
+* Mesh: wedge of 5 degrees, symmetric about the x-y plane; patches `inlet`,
+  `nozzle` (wall), `outlet` (the exit plane), `front`, `back`; with a plume
+  also `base` (wall) and `farfield`.
+* Boundary conditions: total pressure and temperature at the inlet,
+  adiabatic walls, extrapolation at the supersonic exit; total-pressure
+  entrainment at the plume farfield.
 * Solution: `rhoCentralFoam` with local time stepping from the 1-D frozen
-  solution. Function objects record the mass flow at the injector face and
-  the exit plane, the exit-plane momentum and pressure integrals, and the
-  wall force; `ceatofoam post` computes the thrust from the exit plane and,
-  as a check of the momentum budget, from the wall force.
+  solution. Function objects record the mass flow at the inlet, the throat
+  and the exit plane, the exit-plane momentum and pressure integrals, the
+  wall force, the extremes of p and T, and axis and wall profiles.
+  `ceatofoam post` averages over the last quarter of the iterations and
+  reports the thrust from the exit plane and, as a check of the momentum
+  budget, from the wall force, with the mass balance and the iterative
+  standard deviation. Judge convergence by the mass balance.
 
 ## Tests
 

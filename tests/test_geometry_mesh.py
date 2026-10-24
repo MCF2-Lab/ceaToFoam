@@ -109,6 +109,14 @@ class TestWedge(unittest.TestCase):
     @unittest.skipUnless(shutil.which("blockMesh") and shutil.which("checkMesh"),
                          "OpenFOAM not sourced")
     def test_check_mesh(self):
+        self._check(mesh.MeshSettings())
+
+    @unittest.skipUnless(shutil.which("blockMesh") and shutil.which("checkMesh"),
+                         "OpenFOAM not sourced")
+    def test_check_mesh_plume(self):
+        self._check(mesh.MeshSettings(plume_length=4.0, plume_radius=3.0))
+
+    def _check(self, settings):
         tut = os.path.join(os.environ["FOAM_TUTORIALS"], "compressible",
                            "rhoCentralFoam", "LadenburgJet60psi", "system")
         with tempfile.TemporaryDirectory() as case:
@@ -116,7 +124,7 @@ class TestWedge(unittest.TestCase):
             for f in ("controlDict", "fvSchemes", "fvSolution"):
                 shutil.copy(os.path.join(tut, f),
                             os.path.join(case, "system", f))
-            mesh.write_block_mesh_dict(case, self.c, mesh.MeshSettings())
+            mesh.write_block_mesh_dict(case, self.c, settings)
             for app in ("blockMesh", "checkMesh"):
                 out = subprocess.run([app, "-case", case],
                                      capture_output=True, text=True)

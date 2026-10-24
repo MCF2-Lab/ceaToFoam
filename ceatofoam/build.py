@@ -229,6 +229,13 @@ def initial_slices(mixture, tc, pc, contour, n_sub=30, n_sup=30):
     return out
 
 
+def _exit_state(mixture, tc, pc, contour):
+    st = sizing.frozen_station_at_area(
+        mixture, tc, pc, contour.area_ratio, True
+    )
+    return st.p, st.T, st.u
+
+
 def _git_revision():
     here = os.path.dirname(os.path.abspath(__file__))
     try:
@@ -285,9 +292,14 @@ def make_case(cfg, case_dir):
         x_exit=contour.x_exit, rc=contour.rc, re=contour.re,
         inlet_velocity=u_in, initial_slices=slices,
         x_end=mesh_summary["x_end"],
+        initial_jet=_exit_state(mix, d["tc"], d["pc"], contour),
+        plume=mesh_summary["plume"],
+        x_inlet=mesh_summary["x_inlet"],
         wall_points=[
             (float(x), float(contour.radius(x)))
-            for x in np.linspace(0.0, contour.x_exit, 201)[1:-1]
+            for x in np.linspace(
+                mesh_summary["x_inlet"], contour.x_exit, 201
+            )[1:-1]
         ],
     )
     write_case(case_dir, conditions, solver_s)
