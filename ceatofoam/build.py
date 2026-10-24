@@ -281,12 +281,17 @@ def make_case(cfg, case_dir):
     mesh_s = mesh.MeshSettings(**cfg.get("mesh", {}))
     solver_s = SolverSettings(**cfg.get("solver", {}))
 
-    # janaf range: 200 K unless the 1-D exit or the ambient state is colder
-    # (cold-flow cases); the coefficients are then fitted to the Cantera
-    # polynomials extrapolated below their data range, which is recorded.
+    # janaf range: 200 K unless the coldest expected temperature (1-D exit,
+    # and ambient when a plume region is meshed) is below 400 K; then half
+    # of it, since start-up transients undershoot the steady minimum (tests:
+    # 199 K at a 370 K exit, 89 K at a 130 K exit). The coefficients are
+    # fitted to the Cantera polynomials, extrapolated below their data range
+    # if needed (recorded).
     jet = _exit_state(mix, d["tc"], d["pc"], contour)
-    t_min = min(jet[1], d["t_amb"])
-    t_low = 200.0 if t_min >= 250.0 else 10.0*math.floor(0.7*t_min/10.0)
+    t_min = jet[1]
+    if mesh_s.plume_length > 0.0:
+        t_min = min(t_min, d["t_amb"])
+    t_low = 200.0 if t_min >= 400.0 else 10.0*math.floor(0.5*t_min/10.0)
     janaf = thermo.fit_janaf(mix, t_low=t_low)
     t_lo = 0.8*min(target.te, d["t_amb"]) if "gas" in cfg else 0.8*target.te
     suth = thermo.fit_sutherland(mix, t_lo, 1.05*d["tc"])
