@@ -1,0 +1,21 @@
+# RP-1/LOX, 500 psi, O/F 2.4, 500 lbf at sea level (the example of the
+# ceaToFoam 1.x documentation), sized with the frozen chamber mixture.
+propellants:
+  fuel: RP-1
+  oxidizer: O2(L)
+chamber:
+  pressure: 500 psi
+  mixture_ratio: 2.4
+design:
+  thrust: 500 lbf
+  altitude: 0 ft
+  sizing: frozen
+geometry:
+  characteristic_length: 40 in
+  convergent_half_angle: 30 deg
+  divergent_half_angle: 15 deg
+mesh:
+  radial_cells: 40
+solver:
+  model: kOmegaSST
+  iterations: 20000

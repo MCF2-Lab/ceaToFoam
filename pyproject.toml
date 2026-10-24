@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ceatofoam"
+dynamic = ["version"]
+description = "NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases"
+readme = "README.md"
+license = {text = "GPL-3.0-only"}
+authors = [
+    {name = "Luke Cerda"},
+    {name = "Ehsan Madadi-Kandjani", email = "ehsan.madadi@csulb.edu"},
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy",
+    "scipy",
+    "cantera>=3.0",
+    "CEA_Wrap>=2.1",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+
+[project.scripts]
+ceatofoam = "ceatofoam.cli:main"
+
+[project.urls]
+Repository = "https://github.com/MCF2-Lab/ceaToFoam"
+
+[tool.setuptools]
+packages = ["ceatofoam"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ceatofoam.__version__"}
