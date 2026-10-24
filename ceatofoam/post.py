@@ -62,6 +62,25 @@ def _series(case, fo, filename="surfaceFieldValue.dat"):
     return data
 
 
+def _read_minmax_T(case):
+    """(iteration, min T, max T) rows from the minMax function object."""
+    base = os.path.join(case, "postProcessing", "minMax")
+    rows = []
+    for t in sorted(os.listdir(base), key=float):
+        path = os.path.join(base, t, "fieldMinMax.dat")
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
+            for line in f:
+                tok = line.split()
+                if len(tok) > 6 and not line.startswith("#") and tok[1] == "T":
+                    # Time field min (location) max (location)
+                    vals = line.replace("(", " ").replace(")", " ").split()
+                    rows.append((float(vals[0]), float(vals[2]),
+                                 float(vals[6])))
+    return np.array(rows)
+
+
 def evaluate(case, window=0.25):
     with open(os.path.join(case, "ceatofoam.json")) as f:
         rec = json.load(f)
@@ -108,6 +127,15 @@ def evaluate(case, window=0.25):
     budget, _, _ = stat(f_budget)
     j = min(len(avg_e), n) - 1
     design = rec["design"]
+    # Extremes of T in the averaging window: start-up transients may touch
+    # the janaf limits (clipped by OpenFOAM); the converged state must not.
+    try:
+        mm = _read_minmax_T(case)
+        sel = mm[:, 0] >= mm[-1, 0]*(1 - window)
+        t_min_window = float(mm[sel, 1].min())
+        t_max_window = float(mm[sel, 2].max())
+    except (FileNotFoundError, IndexError, ValueError):
+        t_min_window = t_max_window = float("nan")
     try:
         thr = _series(case, "throatFlux")   # Time, area, areaNormalIntegrate
         rt = rec["geometry"]["rt"]
@@ -137,6 +165,9 @@ def evaluate(case, window=0.25):
         # Injector-face mass flow: it settles first; equal to the exit and
         # throat values once mdot_balance is small.
         "discharge_coefficient": mdot_in/rec["mdot_ideal"],
+        "t_min_window": t_min_window,
+        "t_max_window": t_max_window,
+        "janaf_t_low": rec["fits"]["janaf"].get("t_low", 200.0),
         "design": {
             "model": design["model"],
             "thrust": design["thrust"],
