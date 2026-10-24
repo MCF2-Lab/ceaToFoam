@@ -21,7 +21,8 @@ validation cases), with the chamber temperature::
 ``design.sizing`` is frozen (default), equilibrium or constant-gamma
 (``design.gamma``: a number, ``gammas`` for the CEA chamber gamma_s or
 ``frozen`` for the frozen chamber gamma; ``design.molecular_weight``:
-``chamber`` (default) or a number). The ambient state is either
+``chamber`` (default), ``station-average`` (mean of the CEA chamber, throat
+and exit values, as ceaToFoam 1.x) or a number). The ambient state is either
 ``design.altitude`` or ``design.ambient_pressure`` and
 ``design.ambient_temperature``.
 
@@ -141,7 +142,15 @@ def make_design(cfg):
         else:
             gamma = float(g)
         mw = design_cfg.get("molecular_weight", "chamber")
-        mw = mixture.mw if mw == "chamber" else float(mw)
+        if mw == "chamber":
+            mw = mixture.mw
+        elif mw == "station-average":
+            # ceaToFoam 1.x: mean of the chamber, throat and exit M,(1/n)
+            # of the equilibrium solution.
+            st = cea_points["equilibrium"].m_stations
+            mw = sum(st)/len(st)
+        else:
+            mw = float(mw)
         target = sizing.size_constant_gamma(
             thrust if thrust else 1.0, pc, tc, p_amb, gamma, mw
         )

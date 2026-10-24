@@ -101,6 +101,16 @@ class TestAgainstCEA(unittest.TestCase):
         self.assertAlmostEqual(self.mix.cp(f.tc)/f.cp_c, 1, places=3)
         self.assertAlmostEqual(self.mix.mw/f.mw_c, 1, places=4)
 
+    def test_v1_station_average_molecular_weight(self):
+        """ceaToFoam 1.x averaged M,(1/n) over chamber, throat and exit:
+        23.12 kg/kmol for this case (paper Appendix A)."""
+        from ceatofoam import cea
+
+        eq = cea.run_rocket(
+            "RP-1", "O2(L)", self.pc, 2.4, self.pc/self.p_amb, "equilibrium"
+        )
+        self.assertAlmostEqual(sum(eq.m_stations)/3, 23.12, places=2)
+
     def test_exit_state(self):
         from ceatofoam import sizing
 

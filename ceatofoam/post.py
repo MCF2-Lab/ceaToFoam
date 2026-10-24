@@ -154,8 +154,43 @@ def evaluate(case, window=0.25):
     return result
 
 
+def profiles(case):
+    """Latest wall and axis profiles as CSV text: x, x - x_throat, r,
+    p/p0, T, Ma (p0 the chamber pressure). Returns {name: csv_text}."""
+    with open(os.path.join(case, "ceatofoam.json")) as f:
+        rec = json.load(f)
+    base = os.path.join(case, "postProcessing", "profiles")
+    if not os.path.isdir(base):
+        return {}
+    latest = max(os.listdir(base), key=float)
+    p0 = rec["chamber"]["p"]
+    x_t = rec["geometry"]["x_throat"]
+    out = {}
+    for name in ("wall", "axis"):
+        path = os.path.join(base, latest, f"{name}_Ma_T_p_U.xy")
+        if not os.path.exists(path):
+            continue
+        data = np.loadtxt(path)
+        x = data[:, 0]
+        if name == "wall":
+            stations = np.array(rec["geometry"]["stations"])
+            r = np.interp(x, stations[:, 0], stations[:, 1])
+        else:
+            r = np.zeros_like(x)
+        rows = ["x,x_minus_throat,r,p_over_p0,T,Ma"] + [
+            f"{a:.8g},{a - x_t:.8g},{b:.8g},{c/p0:.8g},{d:.8g},{e:.8g}"
+            for a, b, c, d, e in zip(x, r, data[:, 3], data[:, 2],
+                                     data[:, 1])
+        ]
+        out[name] = "\n".join(rows) + "\n"
+    return out
+
+
 def write(case, window=0.25):
     result = evaluate(case, window)
+    for name, text in profiles(case).items():
+        with open(os.path.join(case, f"profile_{name}.csv"), "w") as f:
+            f.write(text)
     with open(os.path.join(case, "results.json"), "w") as f:
         json.dump(result, f, indent=2)
     return result

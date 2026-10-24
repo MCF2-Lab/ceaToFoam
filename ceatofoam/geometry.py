@@ -21,7 +21,8 @@ def contraction_ratio_correlation(throat_diameter):
     """Empirical chamber contraction ratio Ac/At = 8.0 Dt^-0.6 + 1.25.
 
     Dt in cm (Humble, Henry and Larson 1995, Space Propulsion Analysis and
-    Design, Ch. 5). ``throat_diameter`` is given in metres.
+    Design, Fig. 5.24, adapted from Huzel and Huang 1992).
+    ``throat_diameter`` is given in metres.
     """
     return 8.0*(throat_diameter*100.0)**-0.6 + 1.25
 
