@@ -39,6 +39,11 @@ class FrozenMixture:
         )
         self.composition = {s: x/total for s, x in kept.items()}
         self.mechanism = mechanism
+        #: Lowest temperature covered by the thermodynamic data of every
+        #: species in the mixture; below it the polynomials are extrapolated.
+        self.t_data_min = max(
+            self.gas.species(s).thermo.min_temp for s in self.composition
+        )
         self.gas.TPX = 300.0, P_STD, self.composition
         #: Molecular weight [kg/kmol] of the frozen mixture.
         self.mw = self.gas.mean_molecular_weight
@@ -73,7 +78,7 @@ class FrozenMixture:
         self._set(T)
         return self.gas.viscosity
 
-    def temperature_at(self, s0, p, bracket=(150.0, 6000.0)):
+    def temperature_at(self, s0, p, bracket=(50.0, 6000.0)):
         """Temperature where s(T, p) = s0 (isentropic state at pressure p)."""
         return brentq(lambda T: self.s(T, p) - s0, *bracket, xtol=1e-10)
 

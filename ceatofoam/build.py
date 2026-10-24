@@ -281,7 +281,13 @@ def make_case(cfg, case_dir):
     mesh_s = mesh.MeshSettings(**cfg.get("mesh", {}))
     solver_s = SolverSettings(**cfg.get("solver", {}))
 
-    janaf = thermo.fit_janaf(mix)
+    # janaf range: 200 K unless the 1-D exit or the ambient state is colder
+    # (cold-flow cases); the coefficients are then fitted to the Cantera
+    # polynomials extrapolated below their data range, which is recorded.
+    jet = _exit_state(mix, d["tc"], d["pc"], contour)
+    t_min = min(jet[1], d["t_amb"])
+    t_low = 200.0 if t_min >= 250.0 else 10.0*math.floor(0.7*t_min/10.0)
+    janaf = thermo.fit_janaf(mix, t_low=t_low)
     t_lo = 0.8*min(target.te, d["t_amb"]) if "gas" in cfg else 0.8*target.te
     suth = thermo.fit_sutherland(mix, t_lo, 1.05*d["tc"])
 
@@ -301,7 +307,7 @@ def make_case(cfg, case_dir):
         x_exit=contour.x_exit, rc=contour.rc, re=contour.re,
         inlet_velocity=u_in, initial_slices=slices,
         x_end=mesh_summary["x_end"],
-        initial_jet=_exit_state(mix, d["tc"], d["pc"], contour),
+        initial_jet=jet,
         plume=mesh_summary["plume"],
         x_inlet=mesh_summary["x_inlet"],
         wall_points=[
@@ -328,9 +334,13 @@ def make_case(cfg, case_dir):
             "molecular_weight": mix.mw,
             "gamma_chamber": gamma_c,
             "gamma_ambient": mix.gamma(d["t_amb"]),
+            "data_min_temperature": mix.t_data_min,
+            "extrapolated_below": (mix.t_data_min
+                                   if janaf.t_low < mix.t_data_min else None),
         },
         "fits": {
             "janaf": {
+                "t_low": janaf.t_low,
                 "low": list(janaf.low), "high": list(janaf.high),
                 "cp_max_rel_error": janaf.cp_max_rel_error,
                 "h_max_abs_error": janaf.h_max_abs_error,
