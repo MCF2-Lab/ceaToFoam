@@ -176,6 +176,9 @@ def evaluate(case, window=0.25):
             "pe": design["pe"],
             "te": design["te"],
             "mach_e": design["mach_e"],
+            "gamma_c": design["gamma_c"],
+            "area_ratio": design["area_ratio"],
+            "cstar": design["cstar"],
         },
     }
     if not rec["explicit_geometry"]:
