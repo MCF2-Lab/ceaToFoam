@@ -1,0 +1,10 @@
+/* The figures are drawn on white; keep them on white in the dark scheme. */
+[data-md-color-scheme="slate"] .md-typeset img.figure {
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.md-typeset figure img {
+  max-width: 100%;
+}

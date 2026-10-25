@@ -1,166 +1,149 @@
+<div align="center">
+
 # ceaToFoam
 
-ceaToFoam turns a NASA CEA chamber solution into a ready-to-run OpenFOAM
-case for the compressible flow through a conical liquid-rocket thrust
-chamber and its near plume. It
+**From a NASA CEA chamber solution to a ready-to-run OpenFOAM thrust-chamber case**
 
-1. runs CEA (through [CEA_Wrap](https://github.com/civilwargeeky/CEA_Wrap))
-   for the propellants, chamber pressure and mixture ratio, with shifting
-   equilibrium and frozen at the chamber;
-2. freezes the chamber composition and evaluates it with
-   [Cantera](https://cantera.org) (molecular weight, cp(T), viscosity);
-3. sizes the throat and exit for a design thrust and ambient pressure;
-4. builds a conical chamber contour (cylinder, fillet, convergent cone,
-   throat arcs, divergent cone) with the chamber volume given by L*;
-5. writes an axisymmetric wedge `blockMeshDict` and a `rhoCentralFoam`
-   case whose `janaf` and `sutherland` coefficients are fitted to the same
-   frozen mixture;
-6. after the run, evaluates thrust, mass flow and the exit state.
+[![Documentation](https://img.shields.io/badge/docs-mcf2--lab.github.io%2FceaToFoam-3f51b5.svg)](https://mcf2-lab.github.io/ceaToFoam/)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](pyproject.toml)
+[![OpenFOAM v2606](https://img.shields.io/badge/OpenFOAM-v2606-1f6fb2.svg)](https://www.openfoam.com)
+[![Cite](https://img.shields.io/badge/cite-CITATION.cff-lightgrey.svg)](CITATION.cff)
 
-The sizing and the CFD use the same thermodynamics: by default the nozzle
-is sized by the isentropic expansion of the frozen mixture with
-temperature-dependent cp, which reproduces CEA's own frozen solution
-(exit temperature, Mach number and Isp to within 0.1 %). Sizing with CEA's
-shifting-equilibrium performance or with the constant-gamma relations is
-available for comparison.
+<img src="docs/images/hero.png" alt="Mach number and temperature in an RP-1/LOX thrust chamber" width="90%">
 
-## Installation
+<sub>Mach number (upper half) and temperature (lower half) in an RP-1/LOX thrust chamber at 500 psia and O/F 2.4,
+sized for 2250 lbf at sea level with the frozen mixture and computed with the k-ω SST model.</sub>
 
-Python 3.9 or newer and an OpenFOAM.com release (tested with v2606):
+</div>
 
-```sh
-git clone https://github.com/MCF2-Lab/ceaToFoam.git
-cd ceaToFoam
-pip install .            # or: pip install .[plot] for the O/F sweep figure
+ceaToFoam takes the propellants, chamber pressure, mixture ratio and design
+thrust of a liquid-rocket engine and writes an axisymmetric `rhoCentralFoam`
+case for the flow through its conical thrust chamber. The chamber composition
+computed by CEA is frozen and evaluated with one set of thermodynamic and
+transport data, and this one description of the gas both sizes the nozzle and
+defines the thermophysical model of the simulation. The design point and the
+CFD therefore describe the same gas, so the difference between them is the
+multidimensional and viscous loss of the thrust chamber, not an artefact of
+the handoff.
+
+**Documentation: <https://mcf2-lab.github.io/ceaToFoam/>**
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Operating point<br/>propellants, O/F, pc,<br/>thrust, ambient"] --> B["NASA CEA<br/>(CEA_Wrap)"]
+    B --> C["Frozen chamber mixture<br/>(Cantera)"]
+    C --> D["Design point<br/>throat, exit, c*"]
+    C --> F["janaf and Sutherland<br/>fits"]
+    D --> E["Conical contour<br/>wedge mesh"]
+    E --> G["rhoCentralFoam case"]
+    F --> G
+    G --> H["ceatofoam post<br/>thrust, mass flow,<br/>exit state"]
 ```
 
-CEA_Wrap ships the CEA executable for Windows only. On Linux and macOS
-compile the Fortran source that comes with it once, and tell CEA_Wrap where
-the executable is:
+## Verified and validated
+
+| Check | Result |
+| --- | --- |
+| Frozen sizing vs. CEA's frozen solution | exit temperature, Mach number and Isp within 0.1 % |
+| Simulated vs. design exit pressure (frozen sizing, inviscid) | within 2.03 % for RP-1, CH₄ and H₂ with LOX at 500 and 1500 psia |
+| Simulated vs. design mass flow rate (same cases) | within 0.54 % |
+| Wall pressure in conical nozzles, Back et al. (1965) | RMS deviation of p/p<sub>t</sub> at most 0.018 |
+| Discharge coefficient, Back and Cuffel (1971) | within the measurement uncertainty for 5 of 7 nozzles |
+| Base mesh vs. finest mesh | thrust, mass flow, exit pressure and Isp within 0.27 % |
+
+Sizing the same nozzles with CEA's equilibrium isentropic exponent instead
+leaves the frozen-flow simulation 16 to 21 % below the design exit pressure,
+while the mass flow rate stays within 0.7 % of the design value. Details are on
+the [verification and validation](https://mcf2-lab.github.io/ceaToFoam/validation/)
+page.
+
+<p align="center">
+<img src="docs/images/exit-pressure.png" alt="Simulated exit pressure relative to the design value for three sizing models" width="80%">
+</p>
+
+## Quick start
 
 ```sh
-ASSETS=$(python -c "import CEA_Wrap, os; print(os.path.join(os.path.dirname(CEA_Wrap.__file__), 'assets'))")
+git clone https://github.com/MCF2-Lab/ceaToFoam.git && cd ceaToFoam
+pip install .                     # or: pip install '.[plot]'
+
+ceatofoam design examples/rp1-lox-500psi.yaml            # print the design point
+ceatofoam case   examples/rp1-lox-500psi.yaml cases/rp1  # write the case
+cd cases/rp1 && ./Allrun                                 # blockMesh ... rhoCentralFoam
+ceatofoam post   .                                       # thrust, mass flow -> results.json
+```
+
+Requirements: Python 3.9 or newer, an OpenFOAM.com release (tested with
+v2606) and the CEA executable. CEA_Wrap ships the executable for Windows only;
+on Linux and macOS compile it once:
+
+```sh
+ASSETS=$(python3 -c "import CEA_Wrap, os; print(os.path.join(os.path.dirname(CEA_Wrap.__file__), 'assets'))")
 mkdir -p ~/.local/bin && cd "$ASSETS"
 gfortran -O2 -std=legacy -o ~/.local/bin/Dan_CEA2 dan_cea2.f
 export CEA_EXE_LOCATION=~/.local/bin/Dan_CEA2    # add to ~/.bashrc
 ```
 
-## Usage
+## Commands
 
-```sh
-ceatofoam design examples/rp1-lox-500psi.yaml          # print the design point
-ceatofoam case   examples/rp1-lox-500psi.yaml cases/rp1 # write the case
-cd cases/rp1 && ./Allrun                                # blockMesh ... rhoCentralFoam
-ceatofoam post   cases/rp1                              # thrust, mass flow -> results.json
-ceatofoam sweep  --fuel RP-1 --oxidizer "O2(L)" --pressure "500 psi" --plot of.png
-ceatofoam interactive cases/mycase                     # console dialogue of version 1
-```
+| Command | What it does |
+| --- | --- |
+| `ceatofoam design INPUT` | Print the CEA results, the frozen mixture and the design point |
+| `ceatofoam case INPUT CASE_DIR` | Write the OpenFOAM case and its record `ceatofoam.json` |
+| `ceatofoam post CASE_DIR` | Average the last quarter of the run and write `results.json` |
+| `ceatofoam sweep --fuel F --oxidizer O --pressure P` | Run CEA over a range of O/F |
+| `ceatofoam interactive CASE_DIR` | Ask for the inputs on the console, then write the case |
 
-`ceatofoam case` also writes `ceatofoam.json` into the case: the input,
-the CEA results, the frozen mixture, the fit errors, the design point, the
-contour, the mesh and the versions of every component (including the
-source revision of ceaToFoam), so a case can always be traced back.
+Every case records its input, the CEA results, the frozen mixture, the fit
+errors, the design point, the contour, the mesh and the versions of every
+component, including the source revision of ceaToFoam.
 
-### Input
+## Documentation
 
-Quantities are SI numbers or strings with units (`"500 psi"`, `"2250 lbf"`,
-`"40 in"`, `"15 deg"`).
+| Page | Contents |
+| --- | --- |
+| [Installation](https://mcf2-lab.github.io/ceaToFoam/installation/) | requirements, CEA on Linux and macOS, tests |
+| [Usage](https://mcf2-lab.github.io/ceaToFoam/usage/) | a complete walkthrough, from the design point to `results.json` |
+| [Input reference](https://mcf2-lab.github.io/ceaToFoam/input/) | every option of the YAML input |
+| [The OpenFOAM case](https://mcf2-lab.github.io/ceaToFoam/case/) | domain, mesh, boundary conditions, thermophysics, function objects |
+| [Method](https://mcf2-lab.github.io/ceaToFoam/method/) | frozen mixture, sizing models, geometry, solver, performance evaluation |
+| [Verification and validation](https://mcf2-lab.github.io/ceaToFoam/validation/) | grid convergence, conical-nozzle measurements, handoff and viscous losses |
 
-```yaml
-propellants: {fuel: RP-1, oxidizer: O2(L)}   # fuel_temperature, oxidizer_temperature optional
-chamber:     {pressure: 500 psi, mixture_ratio: 2.4}
-design:
-  thrust: 500 lbf
-  altitude: 0 ft          # or ambient_pressure and ambient_temperature
-  sizing: frozen          # frozen | equilibrium | constant-gamma (gamma: gammas | frozen | <number>)
-geometry:
-  characteristic_length: 40 in
-  convergent_half_angle: 30 deg
-  divergent_half_angle: 15 deg
-  contraction_ratio: auto         # 8.0 Dt[cm]^-0.6 + 1.25 (Humble et al. 1995)
-  throat_upstream_radius: 1.5     # times the throat radius
-  throat_downstream_radius: 1.5
-  chamber_fillet_radius: 1.0
-mesh:
-  radial_cells: 40      # axis to wall
-  cell_aspect: 1.0      # axial/radial cell size
-  scale: 1.0            # multiplies every count (mesh studies)
-  include_cylinder: false
-  plume_length: 0       # exit diameters; 0: domain ends at the exit
-  plume_radius: 3       # exit radii
-solver:
-  model: kOmegaSST      # inviscid | laminar | kOmegaSST
-  iterations: 20000     # local time stepping: one time unit per iteration
-  max_co: 0.2
-```
-
-A fixed-composition gas with a given chamber temperature replaces
-`propellants` for cold-flow cases, and the geometry can be given
-explicitly (`throat_radius`, `area_ratio`, `contraction_ratio`,
-`chamber_length`); see the docstring of `ceatofoam/build.py`.
-
-### The OpenFOAM case
-
-* Thermophysics: `hePsiThermo`, `pureMixture`, `sutherland`, `janaf`,
-  `perfectGas`, `sensibleInternalEnergy`. One pseudo-species: the frozen
-  chamber mixture, which also fills the ambient region.
-* Domain: from the end of the cylindrical chamber to the nozzle exit. In
-  a steady frozen flow the cylinder is a duct at constant total
-  conditions, and its low Mach number slows the density-based solver;
-  `include_cylinder: true` meshes it anyway, and `plume_length` > 0 adds a
-  plume region behind the exit (for flow pictures; thrust and mass flow
-  need only the exit plane).
-* Mesh: wedge of 5 degrees, symmetric about the x-y plane; patches `inlet`,
-  `nozzle` (wall), `outlet` (the exit plane), `front`, `back`; with a plume
-  also `base` (wall) and `farfield`.
-* Boundary conditions: total pressure and temperature at the inlet,
-  adiabatic walls, extrapolation at the supersonic exit; total-pressure
-  entrainment at the plume farfield.
-* Solution: `rhoCentralFoam` with local time stepping from the 1-D frozen
-  solution. Function objects record the mass flow at the inlet, the throat
-  and the exit plane, the exit-plane momentum and pressure integrals, the
-  wall force, the extremes of p and T, and axis and wall profiles.
-  `ceatofoam post` averages over the last quarter of the iterations and
-  reports the thrust from the exit plane and, as a check of the momentum
-  budget, from the wall force, with the mass balance and the iterative
-  standard deviation. Judge convergence by the mass balance.
+The documentation source is in [`docs/`](docs); `mkdocs serve` shows it
+locally (`pip install -r docs/requirements.txt`).
 
 ## Tests
 
 ```sh
-python -m unittest discover -s tests
+python3 -m unittest discover -s tests
 ```
 
-Tests that need the CEA executable or OpenFOAM are skipped when these are
-not available.
-
-## Changes from version 1.x
-
-Version 2 is a rewrite of the three scripts of version 1 (tag `v1.0`).
-It corrects the following:
-
-* the nozzle was sized with CEA's equilibrium gamma_s and a molecular
-  weight averaged over chamber, throat and exit, while the CFD solved the
-  frozen chamber mixture with its own gamma; the nozzle was therefore
-  over-expanded in the CFD and the exit pressure about 16 % below ambient;
-* angles were converted to radians and then treated as degrees in the mesh,
-  which collapsed the throat arcs and changed the convergent angle;
-* the two wedge faces were rotated from already-rotated coordinates, which
-  made the wedge asymmetric (checkMesh failed);
-* the enthalpy and entropy constants of the janaf fit were evaluated at the
-  chamber state instead of the reference state;
-* the viscosity was that of air;
-* the atmosphere-layer boundaries were in feet instead of metres;
-* the mesh spacing and the plume domain did not scale with the engine.
+Tests that need the CEA executable or OpenFOAM are skipped when these are not
+available.
 
 ## Limitations
 
 The composition is frozen at the chamber (no finite-rate or shifting
-chemistry in the nozzle), the gas is ideal, the wall is adiabatic, the
-contour is conical, and the ambient gas is the exhaust mixture at ambient
-temperature and pressure.
+chemistry in the nozzle), the gas is ideal, the walls are adiabatic and the
+contour is conical. Injectors, combustion and wall cooling are not modelled.
 
-## License
+## Citing
 
-GPL-3.0. Authors: Luke Cerda and Ehsan Madadi-Kandjani, California State
+If you use ceaToFoam, please cite it; GitHub's "Cite this repository" button
+reads [CITATION.cff](CITATION.cff). The method, its verification and its
+validation are described in L. Cerda and E. Madadi-Kandjani, *Consistent
+thermochemistry for frozen-flow simulations of liquid-rocket thrust chambers:
+sizing, verification and validation*; the full reference will be added once
+it is published.
+<!-- TODO: journal reference and DOI after publication. -->
+
+## License and authors
+
+ceaToFoam is distributed under the [GNU General Public License v3.0](LICENSE).
+
+Luke Cerda and [Ehsan Madadi-Kandjani](https://www.ehsanmadadi.com),
+Department of Mechanical and Aerospace Engineering, California State
 University Long Beach.

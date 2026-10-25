@@ -7,3 +7,6 @@ dist/
 # cases written while trying the examples
 cases/
 *.foam
+
+# documentation build (mkdocs build)
+site/
