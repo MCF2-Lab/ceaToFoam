@@ -9,7 +9,6 @@
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](pyproject.toml)
 [![OpenFOAM v2606](https://img.shields.io/badge/OpenFOAM-v2606-1f6fb2.svg)](https://www.openfoam.com)
-[![Cite](https://img.shields.io/badge/cite-CITATION.cff-lightgrey.svg)](CITATION.cff)
 
 <img src="docs/images/hero.png" alt="Mach number and temperature in an RP-1/LOX thrust chamber" width="90%">
 
