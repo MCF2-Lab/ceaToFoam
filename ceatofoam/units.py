@@ -49,7 +49,8 @@ def to_si(value, dimension):
     """Convert ``value`` (number or ``"<number> <unit>"``) to SI.
 
     ``dimension`` is one of pressure, force, length, temperature, angle or
-    dimensionless; a unit of another dimension raises ValueError.
+    dimensionless; a number without a unit is SI, and a unit of another
+    dimension raises ValueError.
     """
     if isinstance(value, (int, float)):
         return float(value)
@@ -57,6 +58,6 @@ def to_si(value, dimension):
     if not match:
         raise ValueError(f"cannot parse quantity {value!r}")
     number, unit = float(match.group(1)), match.group(2).lower()
-    if unit not in _DIMENSION[dimension]:
+    if unit and unit not in _DIMENSION[dimension]:
         raise ValueError(f"unit {unit!r} in {value!r} is not a {dimension}")
     return number*_FACTORS[unit]

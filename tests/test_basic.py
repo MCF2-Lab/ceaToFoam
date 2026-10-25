@@ -15,6 +15,11 @@ class TestUnits(unittest.TestCase):
         self.assertAlmostEqual(to_si("40 in", "length"), 1.016)
         self.assertEqual(to_si(15, "angle"), 15.0)
 
+    def test_number_string_is_si(self):
+        # the CLI passes strings, e.g. the default --altitude "0"
+        self.assertEqual(to_si("0", "length"), 0.0)
+        self.assertEqual(to_si("3.5e6", "pressure"), 3.5e6)
+
     def test_wrong_dimension(self):
         with self.assertRaises(ValueError):
             to_si("500 psi", "length")
