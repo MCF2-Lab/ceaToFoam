@@ -22,4 +22,4 @@ frozen chamber mixture. Sizing and CFD use the same frozen thermodynamics
 unless another sizing model is requested explicitly.
 """
 
-__version__ = "2.0.0.dev0"
+__version__ = "2.0.0"

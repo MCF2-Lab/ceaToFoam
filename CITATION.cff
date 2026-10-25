@@ -1,6 +1,15 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
+type: software
 title: "ceaToFoam: NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases"
+abstract: >-
+  ceaToFoam converts a NASA CEA chamber solution into a ready-to-run
+  OpenFOAM rhoCentralFoam case for the flow through a conical
+  liquid-rocket thrust chamber. The chamber composition is frozen and
+  evaluated with one set of thermodynamic and transport data, which both
+  sizes the nozzle for a design thrust and defines the thermophysical
+  model of the axisymmetric simulation, so that the design point and the
+  CFD describe the same gas.
 authors:
   - family-names: Cerda
     given-names: Luke
@@ -11,4 +20,14 @@ authors:
     affiliation: California State University Long Beach
 license: GPL-3.0-only
 repository-code: "https://github.com/MCF2-Lab/ceaToFoam"
-version: 2.0.0.dev0
+url: "https://mcf2-lab.github.io/ceaToFoam/"
+keywords:
+  - OpenFOAM
+  - NASA CEA
+  - rocket nozzle
+  - liquid rocket engine
+  - thermochemistry
+  - compressible flow
+  - rhoCentralFoam
+version: 2.0.0
+date-released: "2026-10-25"
