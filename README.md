@@ -142,7 +142,11 @@ it is published.
 
 ## License and authors
 
-ceaToFoam is distributed under the [GNU General Public License v3.0](LICENSE).
+Copyright (C) 2025-2026 Luke Cerda and Ehsan Madadi-Kandjani.
+
+ceaToFoam is free software, distributed under the
+[GNU General Public License v3.0](LICENSE) (GPL-3.0-only), without any
+warranty.
 
 Luke Cerda and [Ehsan Madadi-Kandjani](https://www.ehsanmadadi.com),
 Department of Mechanical and Aerospace Engineering, California State

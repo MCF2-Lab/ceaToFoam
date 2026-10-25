@@ -7,7 +7,7 @@ repo_name: MCF2-Lab/ceaToFoam
 edit_uri: edit/main/docs/
 exclude_docs: |
   requirements.txt
-copyright: Copyright &copy; 2026 Luke Cerda and Ehsan Madadi-Kandjani, California State University Long Beach. GPL-3.0.
+copyright: Copyright &copy; 2025-2026 Luke Cerda and Ehsan Madadi-Kandjani. GPL-3.0-only.
 
 nav:
   - Home: index.md

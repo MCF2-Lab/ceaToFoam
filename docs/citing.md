@@ -29,8 +29,11 @@ McBride, 1994; McBride and Gordon, 1996), Cantera, and OpenFOAM with
 
 ## License
 
+Copyright (C) 2025-2026 Luke Cerda and Ehsan Madadi-Kandjani.
+
 ceaToFoam is free software, distributed under the
-[GNU General Public License v3.0](https://github.com/MCF2-Lab/ceaToFoam/blob/main/LICENSE).
+[GNU General Public License v3.0](https://github.com/MCF2-Lab/ceaToFoam/blob/main/LICENSE)
+(GPL-3.0-only), without any warranty.
 
 ## Authors
 

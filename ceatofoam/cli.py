@@ -1,3 +1,19 @@
+# ceaToFoam: NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases
+# Copyright (C) 2025-2026 Luke Cerda and Ehsan Madadi-Kandjani
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License version 3 as published
+# by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+# for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """Command-line interface: ``ceatofoam <command> ...``.
 
 Commands:
@@ -145,9 +161,18 @@ def main(argv=None):
         prog="ceatofoam",
         description="NASA CEA chamber thermochemistry to OpenFOAM"
         " rocket-nozzle cases.",
+        # keeps the line breaks of the --version notice
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--version", action="version",
-                        version=f"ceatofoam {__version__}")
+    parser.add_argument(
+        "--version", action="version",
+        version=f"ceatofoam {__version__}\n"
+        "Copyright (C) 2025-2026 Luke Cerda and Ehsan Madadi-Kandjani\n"
+        "License GPL-3.0-only: GNU GPL version 3"
+        " <https://www.gnu.org/licenses/gpl-3.0.html>.\n"
+        "This is free software, and you are welcome to redistribute it;"
+        " there is NO WARRANTY.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("design", help="print the design point")
