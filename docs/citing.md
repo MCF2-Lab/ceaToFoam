@@ -1,18 +1,28 @@
 # Citing
 
-If you use ceaToFoam in your work, please cite the software. GitHub's "Cite
-this repository" button reads
-[`CITATION.cff`](https://github.com/MCF2-Lab/ceaToFoam/blob/main/CITATION.cff).
+If you use ceaToFoam in your work, please cite the version you used. Every
+release is archived on Zenodo with its own DOI:
+
+| Citing | DOI |
+| --- | --- |
+| ceaToFoam 2.0.0 | [10.5281/zenodo.23637115](https://doi.org/10.5281/zenodo.23637115) |
+| All versions (resolves to the latest) | [10.5281/zenodo.23637114](https://doi.org/10.5281/zenodo.23637114) |
 
 ```bibtex
-@software{ceatofoam,
-  author  = {Cerda, Luke and Madadi-Kandjani, Ehsan},
-  title   = {ceaToFoam: NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases},
-  url     = {https://github.com/MCF2-Lab/ceaToFoam},
-  license = {GPL-3.0-only},
-  year    = {2026}
+@software{ceatofoam_2_0_0,
+  author    = {Cerda, Luke and Madadi-Kandjani, Ehsan},
+  title     = {ceaToFoam: NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases},
+  version   = {2.0.0},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23637115},
+  url       = {https://github.com/MCF2-Lab/ceaToFoam},
+  license   = {GPL-3.0-only}
 }
 ```
+
+GitHub's "Cite this repository" button reads
+[`CITATION.cff`](https://github.com/MCF2-Lab/ceaToFoam/blob/main/CITATION.cff).
 
 The method, its verification and its validation are described in
 

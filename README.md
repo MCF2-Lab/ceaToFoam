@@ -5,6 +5,7 @@
 **From a NASA CEA chamber solution to a ready-to-run OpenFOAM thrust-chamber case**
 
 [![Documentation](https://img.shields.io/badge/docs-mcf2--lab.github.io%2FceaToFoam-3f51b5.svg)](https://mcf2-lab.github.io/ceaToFoam/)
+[![DOI](https://zenodo.org/badge/1340022670.svg)](https://doi.org/10.5281/zenodo.23637114)
 [![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](pyproject.toml)
 [![OpenFOAM v2606](https://img.shields.io/badge/OpenFOAM-v2606-1f6fb2.svg)](https://www.openfoam.com)
@@ -133,7 +134,10 @@ contour is conical. Injectors, combustion and wall cooling are not modelled.
 ## Citing
 
 If you use ceaToFoam, please cite it; GitHub's "Cite this repository" button
-reads [CITATION.cff](CITATION.cff). The method, its verification and its
+reads [CITATION.cff](CITATION.cff). Every release is archived on Zenodo:
+[10.5281/zenodo.23637114](https://doi.org/10.5281/zenodo.23637114) cites all
+versions, and [10.5281/zenodo.23637115](https://doi.org/10.5281/zenodo.23637115)
+cites version 2.0.0. The method, its verification and its
 validation are described in L. Cerda and E. Madadi-Kandjani, *Consistent
 thermochemistry for frozen-flow simulations of liquid-rocket thrust chambers:
 sizing, verification and validation*; the full reference will be added once

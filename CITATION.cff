@@ -19,6 +19,14 @@ authors:
     orcid: "https://orcid.org/0000-0003-3216-3245"
     affiliation: California State University Long Beach
 license: GPL-3.0-only
+doi: 10.5281/zenodo.23637114
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23637114
+    description: All versions of ceaToFoam (resolves to the latest release)
+  - type: doi
+    value: 10.5281/zenodo.23637115
+    description: ceaToFoam 2.0.0
 repository-code: "https://github.com/MCF2-Lab/ceaToFoam"
 url: "https://mcf2-lab.github.io/ceaToFoam/"
 keywords:
