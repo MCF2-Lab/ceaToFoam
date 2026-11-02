@@ -42,6 +42,9 @@ and exit values, as ceaToFoam 1.x) or a number). The ambient state is either
 ``design.altitude`` or ``design.ambient_pressure`` and
 ``design.ambient_temperature``.
 
+``design.gas`` is the gas of the CFD: ``frozen`` (default), ``equilibrium``
+or ``kinetic`` (equivalent gas of that expansion, equivalent.py).
+
 Geometry: either sized from the design (``characteristic_length``,
 ``contraction_ratio`` [auto: Humble et al. correlation]) or explicit
 (``throat_radius``, ``area_ratio``, ``contraction_ratio``,
@@ -60,7 +63,9 @@ import subprocess
 
 import numpy as np
 
-from . import __version__, atmosphere, cea, geometry, mesh, sizing, thermo
+from . import (
+    __version__, atmosphere, cea, equivalent, geometry, mesh, sizing, thermo,
+)
 from .foamcase import CaseConditions, SolverSettings, write_case
 from .units import to_si
 
@@ -131,6 +136,10 @@ def make_design(cfg):
     else:
         raise ValueError("input needs 'propellants' or 'gas'")
 
+    gas_model = design_cfg.get("gas", "frozen")
+    if gas_model != "frozen" and "propellants" not in cfg:
+        raise ValueError(f"gas: {gas_model} needs propellants")
+
     explicit = "throat_radius" in geo
     thrust = (
         to_si(design_cfg["thrust"], "force") if "thrust" in design_cfg
@@ -177,9 +186,6 @@ def make_design(cfg):
         rt = to_si(geo["throat_radius"], "length")
         eps = float(geo["area_ratio"])
         ec = float(geo["contraction_ratio"])
-        # The reference (ideal) mass flow of this throat with frozen flow.
-        throat = sizing.frozen_throat(mixture, tc, pc)
-        mdot_ideal = throat.mass_flux*math.pi*rt**2
     else:
         if thrust is None:
             raise ValueError("sized geometry needs design.thrust")
@@ -190,7 +196,6 @@ def make_design(cfg):
             geometry.contraction_ratio_correlation(2*rt) if ec == "auto"
             else float(ec)
         )
-        mdot_ideal = target.mdot
 
     rc = rt*math.sqrt(ec)
     re = rt*math.sqrt(eps)
@@ -224,9 +229,19 @@ def make_design(cfg):
         float(geo.get("throat_downstream_radius", 1.5))*rt,
         volume,
     )
+    flow_gas = mixture if gas_model == "frozen" else equivalent.build(
+        gas_model, mixture, tc, pc, min(p_amb, target.pe), contour
+    )
+    if explicit:
+        # The reference (ideal) mass flow of this throat with the CFD gas.
+        throat = sizing.frozen_throat(flow_gas, tc, pc)
+        mdot_ideal = throat.mass_flux*math.pi*rt**2
+    else:
+        mdot_ideal = target.mdot
     return {
         "pc": pc, "tc": tc, "p_amb": p_amb, "t_amb": t_amb,
-        "cea": cea_points, "mixture": mixture, "target": target,
+        "cea": cea_points, "mixture": mixture, "gas": flow_gas,
+        "target": target,
         "explicit_geometry": explicit, "mdot_ideal": mdot_ideal,
         "contour": contour,
     }
@@ -293,7 +308,7 @@ def make_case(cfg, case_dir):
     ``case_dir/ceatofoam.json``.
     """
     d = make_design(cfg)
-    mix, contour, target = d["mixture"], d["contour"], d["target"]
+    mix, contour, target = d["gas"], d["contour"], d["target"]
     mesh_s = mesh.MeshSettings(**cfg.get("mesh", {}))
     solver_s = SolverSettings(**cfg.get("solver", {}))
 
@@ -308,9 +323,16 @@ def make_case(cfg, case_dir):
     if mesh_s.plume_length > 0.0:
         t_min = min(t_min, d["t_amb"])
     t_low = 200.0 if t_min >= 400.0 else 10.0*math.floor(0.5*t_min/10.0)
-    janaf = thermo.fit_janaf(mix, t_low=t_low)
-    t_lo = 0.8*min(target.te, d["t_amb"]) if "gas" in cfg else 0.8*target.te
-    suth = thermo.fit_sutherland(mix, t_lo, 1.05*d["tc"])
+    equivalent_gas = isinstance(mix, equivalent.EquivalentGas)
+    if equivalent_gas:
+        # The fit of the path; the range of the viscosity fit is the path.
+        janaf = mix.janaf
+        suth = thermo.fit_sutherland(mix, float(mix.tau[0]), d["tc"])
+    else:
+        janaf = thermo.fit_janaf(mix, t_low=t_low)
+        t_lo = (0.8*min(target.te, d["t_amb"]) if "gas" in cfg
+                else 0.8*target.te)
+        suth = thermo.fit_sutherland(mix, t_lo, 1.05*d["tc"])
 
     gamma_c = mix.gamma(d["tc"])
     m_in = _subsonic_mach(contour.contraction_ratio, gamma_c)
@@ -386,6 +408,12 @@ def make_case(cfg, case_dir):
         "mesh": {**asdict(mesh_s), **mesh_summary},
         "solver": asdict(solver_s),
     }
+    if equivalent_gas:
+        # 1-D expansion of the fitted gas: with the path, the check of the
+        # fit against the sizing (design) and CEA.
+        one_d = sizing.size_frozen(target.thrust, d["pc"], d["tc"],
+                                   target.pe, mix)
+        record["equivalent_gas"] = {**mix.record(), "one_d": one_d.as_dict()}
     with open(os.path.join(case_dir, "ceatofoam.json"), "w") as f:
         json.dump(record, f, indent=2, default=float)
     return record

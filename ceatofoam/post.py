@@ -97,6 +97,25 @@ def _read_minmax_T(case):
     return np.array(rows)
 
 
+def _heat_rate(case, window):
+    """Mean and relative standard deviation of the wall heat rate over the
+    window: the convergence measure of a heated wall."""
+    try:
+        h = _series(case, "wallHeatRate")
+    except FileNotFoundError:
+        return {}
+    sel = h[:, 0] >= h[-1, 0]*(1 - window)
+    mean = float(np.mean(h[sel, 1]))
+    if mean == 0.0:             # adiabatic wall
+        return {}
+    half = h[sel, 1][len(h[sel, 1])//2:]
+    first = h[sel, 1][:len(h[sel, 1])//2]
+    return {
+        "heat_rate_std": float(np.std(h[sel, 1])/abs(mean)),
+        "heat_rate_drift": float(np.mean(half)/np.mean(first) - 1),
+    }
+
+
 def evaluate(case, window=0.25):
     with open(os.path.join(case, "ceatofoam.json")) as f:
         rec = json.load(f)
@@ -166,6 +185,7 @@ def evaluate(case, window=0.25):
         "mdot_inlet": mdot_in,
         "mdot_throat": mdot_throat,
         "mdot_balance": (mdot_in - mdot)/mdot,
+        "mdot_balance_nozzle": (mdot_throat - mdot)/mdot,
         "thrust_exit": thrust,
         "thrust_wall_budget": budget,
         "momentum_closure": (budget - thrust)/thrust,
@@ -236,8 +256,110 @@ def profiles(case):
     return out
 
 
+def _raw_surface(path):
+    """Rows x, y, z, values of a raw surface file."""
+    return np.loadtxt(path, comments="#")
+
+
+def wall_data(case, window=0.25):
+    """Wall values averaged over the last ``window`` of the iterations, one
+    row per wall face, sorted by x: dict of arrays x, q (heat flux from the
+    gas into the wall [W/m2]), q_std (its standard deviation over the
+    window), yplus, tau (shear stress magnitude [Pa]), T, p. Local values of
+    a resolved wall stay unsteady, so one write is not a result. Empty
+    without wallData output."""
+    base = os.path.join(case, "postProcessing", "wallData")
+    if not os.path.isdir(base):
+        return {}
+    times = sorted(os.listdir(base), key=float)
+    times = [t for t in times
+             if float(t) >= float(times[-1])*(1 - window)
+             and os.path.exists(os.path.join(base, t, "yPlus_wall.raw"))]
+    if not times:
+        return {}
+    rows = {n: [] for n in ("q", "yplus", "tau", "T", "p")}
+    for t in times:
+        folder = os.path.join(base, t)
+        q = _raw_surface(os.path.join(folder, "wallHeatFlux_wall.raw"))
+        order = np.argsort(q[:, 0], kind="stable")
+        tau = _raw_surface(os.path.join(folder, "wallShearStress_wall.raw"))
+        # The function object reports the flux into the fluid.
+        rows["q"].append(-q[order, 3])
+        rows["yplus"].append(
+            _raw_surface(os.path.join(folder, "yPlus_wall.raw"))[order, 3])
+        rows["tau"].append(np.linalg.norm(tau[order, 3:6], axis=1))
+        rows["T"].append(_raw_surface(os.path.join(folder, "T_wall.raw"))[order, 3])
+        rows["p"].append(_raw_surface(os.path.join(folder, "p_wall.raw"))[order, 3])
+    out = {n: np.mean(v, axis=0) for n, v in rows.items()}
+    out["q_std"] = np.std(rows["q"], axis=0)
+    out["x"] = q[order, 0]
+    out["samples"] = len(times)
+    return out
+
+
+def wall_summary(case, data):
+    """Scalars of the wall data for results.json. The total heat rate is
+    integrated over the wall of the full annulus."""
+    with open(os.path.join(case, "ceatofoam.json")) as f:
+        rec = json.load(f)
+    stations = np.array(rec["geometry"]["stations"])
+    r = np.interp(data["x"], stations[:, 0], stations[:, 1])
+    x_t = rec["geometry"]["x_throat"]
+    i_t = int(np.argmin(np.abs(data["x"] - x_t)))
+    i_max = int(np.argmax(np.abs(data["q"])))
+    dr = np.gradient(r, data["x"])
+    ds = np.gradient(data["x"])*np.sqrt(1 + dr**2)
+    return {
+        "q_throat": float(data["q"][i_t]),
+        "q_throat_std": float(data["q_std"][i_t]),
+        "q_max": float(data["q"][i_max]),
+        "wall_samples": data["samples"],
+        "x_q_max_over_rt": float(
+            (data["x"][i_max] - x_t)/rec["geometry"]["rt"]),
+        "heat_rate": float(np.sum(data["q"]*2*math.pi*r*ds)),
+        "yplus_max": float(np.max(data["yplus"])),
+        "yplus_mean": float(np.mean(data["yplus"])),
+        "yplus_throat": float(data["yplus"][i_t]),
+    }
+
+
+def wall_csv(case, data):
+    """Wall values as CSV text: x, x - x_throat, q, its standard deviation,
+    y+, tau, T, p."""
+    with open(os.path.join(case, "ceatofoam.json")) as f:
+        rec = json.load(f)
+    x_t = rec["geometry"]["x_throat"]
+    rows = ["x,x_minus_throat,q,q_std,yplus,tau,T,p"]
+    for k in range(len(data["x"])):
+        rows.append(
+            f"{data['x'][k]:.8g},{data['x'][k] - x_t:.8g},{data['q'][k]:.8g},"
+            f"{data['q_std'][k]:.6g},{data['yplus'][k]:.6g},"
+            f"{data['tau'][k]:.6g},{data['T'][k]:.6g},{data['p'][k]:.8g}"
+        )
+    return "\n".join(rows) + "\n"
+
+
+def true_exit_temperature(rec, tau):
+    """Gas temperature at ``tau`` for an equivalent gas (tau otherwise)."""
+    eq = rec.get("equivalent_gas")
+    if not eq:
+        return tau
+    return float(np.interp(tau, eq["tau"], eq["temperature"]))
+
+
 def write(case, window=0.25):
     result = evaluate(case, window)
+    with open(os.path.join(case, "ceatofoam.json")) as f:
+        rec = json.load(f)
+    if rec.get("equivalent_gas"):
+        result["tau_e_mean"] = result["te_mean"]
+        result["te_mean"] = true_exit_temperature(rec, result["te_mean"])
+    wall = wall_data(case, window)
+    if wall:
+        result.update(wall_summary(case, wall))
+        result.update(_heat_rate(case, window))
+        with open(os.path.join(case, "profile_wall_heat.csv"), "w") as f:
+            f.write(wall_csv(case, wall))
     for name, text in profiles(case).items():
         with open(os.path.join(case, f"profile_{name}.csv"), "w") as f:
             f.write(text)

@@ -1,0 +1,25 @@
+# RP-1/LOX, 500 psi, O/F 2.4, 2250 lbf at sea level: frozen-sized engine with
+# a wall-resolved mesh and a wall at 800 K. Check y+ in profile_wall_heat.csv.
+propellants:
+  fuel: RP-1
+  oxidizer: O2(L)
+chamber:
+  pressure: 500 psi
+  mixture_ratio: 2.4
+design:
+  thrust: 2250 lbf
+  altitude: 0 ft
+  sizing: frozen
+geometry:
+  characteristic_length: 40 in
+  convergent_half_angle: 30 deg
+  divergent_half_angle: 15 deg
+mesh:
+  radial_cells: 40
+  first_cell_height: 5.0e-7
+solver:
+  model: kOmegaSST
+  wall_treatment: resolved
+  wall_temperature: 800
+  iterations: 20000
+  write_interval: 5000

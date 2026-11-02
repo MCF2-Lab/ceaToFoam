@@ -81,6 +81,38 @@ def cmd_post(args):
     print(json.dumps(write(args.case_dir, args.window), indent=2))
 
 
+def cmd_heat(args):
+    from . import heat
+    from .build import make_design
+    from .post import wall_data
+
+    with open(f"{args.case_dir}/ceatofoam.json") as f:
+        rec = json.load(f)
+    wall = wall_data(args.case_dir)
+    if not wall:
+        raise SystemExit("no wall data: run with solver.wall_output or a"
+                         " wall temperature, then ceatofoam post")
+    d = make_design(rec["input"])
+    gases = [heat.frozen_properties(d["mixture"], d["tc"])]
+    if "equilibrium" in d["cea"]:
+        gases.append(heat.equilibrium_properties(d["cea"]["equilibrium"]))
+    out = heat.along_contour(
+        d["contour"], d["gas"], d["tc"], d["pc"], d["target"].cstar, gases,
+        wall["T"], wall["x"],
+    )
+    out["q_cfd"] = wall["q"]
+    out["h_cfd"] = wall["q"]/(out["t_aw_frozen"] - wall["T"])
+    out["x_minus_throat"] = wall["x"] - d["contour"].x_throat
+    keys = list(out)
+    path = f"{args.case_dir}/profile_bartz.csv"
+    with open(path, "w") as f:
+        f.write(",".join(keys) + "\n")
+        for k in range(len(wall["x"])):
+            f.write(",".join(f"{out[n][k]:.7g}" for n in keys) + "\n")
+    print(f"Wrote {path}")
+    print(json.dumps(heat.record(gases), indent=2))
+
+
 def cmd_sweep(args):
     import numpy as np
 
@@ -189,6 +221,10 @@ def main(argv=None):
     p.add_argument("--window", type=float, default=0.25,
                    help="fraction of iterations averaged (default 0.25)")
     p.set_defaults(func=cmd_post)
+
+    p = sub.add_parser("heat", help="Bartz along the wall of a finished case")
+    p.add_argument("case_dir")
+    p.set_defaults(func=cmd_heat)
 
     p = sub.add_parser("sweep", help="CEA over a range of O/F")
     p.add_argument("--fuel", required=True)

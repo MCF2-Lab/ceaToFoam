@@ -16,6 +16,8 @@ nav:
   - Input reference: input.md
   - The OpenFOAM case: case.md
   - Method: method.md
+  - Equivalent gas: equivalent-gas.md
+  - Wall heat flux: wall-heat.md
   - Verification and validation: validation.md
   - Citing: citing.md
 

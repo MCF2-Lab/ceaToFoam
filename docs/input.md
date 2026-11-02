@@ -29,6 +29,7 @@ design:
   thrust: 500 lbf
   altitude: 0 ft                     # or ambient_pressure and ambient_temperature
   sizing: frozen                     # frozen | equilibrium | constant-gamma
+  gas: frozen                        # frozen | equilibrium | kinetic
 geometry:
   characteristic_length: 40 in
   convergent_half_angle: 30 deg
@@ -46,12 +47,18 @@ mesh:
   include_cylinder: false
   plume_length: 0
   plume_radius: 3
+  first_cell_height: 0               # wall cell at the throat; 0: no wall layer
+  layer_fraction: 0.25
 solver:
   model: kOmegaSST
   iterations: 20000
   write_interval: 2000
   max_co: 0.2
+  lts_smoothing: 0.02                # above the layer growth with a wall layer
   n_procs: 1
+  wall_treatment: wall-function      # wall-function | resolved
+  wall_temperature: null             # null: adiabatic; K, or a table
+  wall_output: false
 ```
 
 Every key except `propellants` (or `gas`), `chamber` and `design.thrust` has
@@ -102,6 +109,7 @@ chamber:
 | `altitude` | `0` | ambient state from the NASA Glenn Earth atmosphere model |
 | `ambient_pressure`, `ambient_temperature` | — | ambient state given directly (temperature default 288.15 K) |
 | `sizing` | `frozen` | sizing model, see below |
+| `gas` | `frozen` | gas of the simulation: `frozen`, or the [equivalent gas](equivalent-gas.md) of the `equilibrium` or `kinetic` expansion |
 | `gamma` | `gammas` | constant-gamma model only: `gammas` (CEA equilibrium \(\gamma_s\) of the chamber), `frozen` (frozen \(\gamma\) at \(T_c\)) or a number |
 | `molecular_weight` | `chamber` | constant-gamma model only: `chamber`, `station-average` (mean of the CEA chamber, throat and exit values) or a number [kg/kmol] |
 
@@ -117,6 +125,8 @@ page:
 
 The last two are kept for comparison. In a frozen-flow simulation they give
 nozzles that over-expand the gas (see [Verification and validation](validation.md#thermochemical-handoff)).
+With `sizing: equilibrium` and `gas: equilibrium` the design and the simulation
+describe the same expansion again.
 
 ## `geometry`
 

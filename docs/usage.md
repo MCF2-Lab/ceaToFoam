@@ -7,6 +7,7 @@ ceaToFoam is used through the `ceatofoam` command:
 | `ceatofoam design INPUT` | Print the CEA results, the frozen mixture and the design point |
 | `ceatofoam case INPUT CASE_DIR` | Write the OpenFOAM case and its record `ceatofoam.json` |
 | `ceatofoam post CASE_DIR [--window 0.25]` | Average the last part of the run and write `results.json` |
+| `ceatofoam heat CASE_DIR` | Evaluate the Bartz correlation along the wall of a finished case and write `profile_bartz.csv` |
 | `ceatofoam sweep --fuel F --oxidizer O --pressure P` | Run CEA over a range of O/F |
 | `ceatofoam interactive CASE_DIR` | Ask for the inputs on the console, then write the case |
 

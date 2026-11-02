@@ -22,7 +22,11 @@ fitted to the frozen chamber mixture. The ambient gas is the same mixture at
 ambient temperature and pressure (single-species model).
 
 Flow models: ``inviscid`` (Sutherland As = 0, which rhoCentralFoam treats as
-inviscid; slip walls), ``laminar`` and ``kOmegaSST`` (wall functions).
+inviscid; slip walls), ``laminar``, ``kOmegaSST`` and ``kOmegaSSTLM`` (with
+wall functions, or ``wall_treatment: resolved`` on a mesh with a wall layer).
+The wall is adiabatic unless ``wall_temperature`` gives a value [K] or a table
+of (x - x_throat [m], T [K]); ``wall_output`` (implied by a wall temperature)
+records the wall heat flux, y+ and shear stress along the wall.
 
 The case runs to steady state with local time stepping (localEuler; time is
 the iteration count) from the 1-D frozen solution inside the chamber
@@ -40,11 +44,15 @@ import os
 import stat
 
 from .foamfile import fmt, write
+from .units import to_si
+
+#: Flow models with turbulence fields.
+RAS_MODELS = ("kOmegaSST", "kOmegaSSTLM")
 
 
 @dataclass
 class SolverSettings:
-    model: str = "kOmegaSST"      # inviscid | laminar | kOmegaSST
+    model: str = "kOmegaSST"      # inviscid | laminar | kOmegaSST | kOmegaSSTLM
     iterations: int = 20000
     write_interval: int = 2000
     max_co: float = 0.2
@@ -54,6 +62,15 @@ class SolverSettings:
     mixing_length: float = 0.07   # times the chamber diameter
     n_procs: int = 1
     inlet_velocity_bc: str = "zeroGradient"   # or pressureInletOutletVelocity
+    wall_treatment: str = "wall-function"     # or resolved
+    wall_temperature: object = None           # None: adiabatic; K or a table
+    wall_output: bool = False
+    re_theta_inlet: float = 0.0   # kOmegaSSTLM: ReThetat at the inlet
+    turbulent_prandtl: float = 0.85           # wall-function value (stock)
+
+    @property
+    def records_wall(self):
+        return self.wall_output or self.wall_temperature is not None
 
 
 @dataclass
@@ -187,10 +204,47 @@ def _p(c):
 """)
 
 
-def _T(c):
+def _T_wall(s):
+    """Boundary condition of T on the chamber wall."""
+    w = s.wall_temperature
+    if w is None:
+        return """    "(nozzle|base)"
+    {
+        type            zeroGradient;
+    }
+"""
+    if isinstance(w, (list, tuple)):
+        table = " ".join(f"({fmt(x)} {fmt(t)})" for x, t in w)
+        return f"""    nozzle
+    {{
+        // T(x - x_throat), measured or prescribed
+        type            fixedProfile;
+        profile         table ({table});
+        direction       (1 0 0);
+        origin          {{ORIGIN}};
+    }}
+    base
+    {{
+        type            zeroGradient;
+    }}
+"""
+    return f"""    nozzle
+    {{
+        type            fixedValue;
+        value           uniform {fmt(to_si(w, "temperature"))};
+    }}
+    base
+    {{
+        type            zeroGradient;
+    }}
+"""
+
+
+def _T(c, s):
     # Initial face value at the outlet: the 1-D exit state when the domain
     # ends at the exit (setFields sets cells only).
     t_out = c.t_amb if c.plume else c.initial_jet[1]
+    wall = _T_wall(s).replace("{ORIGIN}", fmt(c.x_throat))
     return _field("[0 0 0 1 0 0 0]", fmt(c.t_amb), f"""    inlet
     {{
         type            totalTemperature;
@@ -199,11 +253,7 @@ def _T(c):
         gamma           {fmt(c.gamma_c)};
         value           uniform {fmt(c.tc)};
     }}
-    "(nozzle|base)"
-    {{
-        type            zeroGradient;
-    }}
-    outlet
+{wall}    outlet
     {{
         type            inletOutlet;
         inletValue      uniform {fmt(c.t_amb)};
@@ -245,12 +295,28 @@ def _U(c, model, inlet_bc):
 
 
 def _turbulence_fields(c, s):
-    """k, omega, nut, alphat for kOmegaSST with wall functions."""
+    """k, omega, nut, alphat (and the kOmegaSSTLM fields).
+
+    Wall functions by default. On a resolved wall k = 0 (a small value:
+    the models divide by it), nut = 0 and omega keeps omegaWallFunction,
+    which blends to its viscous-sublayer value at small y+. With a wall
+    temperature the wall-function alphat is the Jayatilleke form, which
+    carries the thermal law of the wall.
+    """
+    resolved = s.wall_treatment == "resolved"
+    if s.wall_treatment not in ("wall-function", "resolved"):
+        raise ValueError(f"unknown wall_treatment {s.wall_treatment!r}")
+    k_wall = ("""        type            fixedValue;
+        value           uniform 1e-10;
+""" if resolved else f"""        type            kqRWallFunction;
+        value           uniform {{K_IN}};
+""")
     k_in = 1.5*(s.turbulence_intensity*c.inlet_velocity)**2
     length = s.mixing_length*2*c.rc
     omega_in = math.sqrt(k_in)/(0.09**0.25*length)
     # Still ambient gas: 1 % of the inlet k with the inlet omega.
     k_amb, omega_amb = 1.0e-2*k_in, omega_in
+    k_wall = k_wall.replace("{K_IN}", fmt(k_in))
     k = _field("[0 2 -2 0 0 0 0]", fmt(k_amb), f"""    inlet
     {{
         type            turbulentIntensityKineticEnergyInlet;
@@ -259,9 +325,7 @@ def _turbulence_fields(c, s):
     }}
     "(nozzle|base)"
     {{
-        type            kqRWallFunction;
-        value           uniform {fmt(k_in)};
-    }}
+{k_wall}    }}
     outlet
     {{
         type            inletOutlet;
@@ -315,19 +379,118 @@ def _turbulence_fields(c, s):
         value           uniform 0;
     }
 """
-    nut = _field("[0 2 -1 0 0 0 0]", "0", calc + """    "(nozzle|base)"
-    {
-        type            nutkWallFunction;
+    nut_wall = "nutLowReWallFunction" if resolved else "nutkWallFunction"
+    nut = _field("[0 2 -1 0 0 0 0]", "0", calc + f"""    "(nozzle|base)"
+    {{
+        type            {nut_wall};
         value           uniform 0;
-    }
+    }}
 """)
-    alphat = _field("[1 -1 -1 0 0 0 0]", "0", calc + """    "(nozzle|base)"
+    jayatilleke = s.wall_temperature is not None and not resolved
+    alphat_wall = ("compressible::alphatJayatillekeWallFunction"
+                   if jayatilleke else "compressible::alphatWallFunction")
+    prt = (f"        Prt             {fmt(s.turbulent_prandtl)};\n"
+           if jayatilleke else "")
+    alphat = _field("[1 -1 -1 0 0 0 0]", "0", calc + f"""    "(nozzle|base)"
+    {{
+        type            {alphat_wall};
+{prt}        value           uniform 0;
+    }}
+""")
+    fields = {"k": k, "omega": omega, "nut": nut, "alphat": alphat}
+    if s.model == "kOmegaSSTLM":
+        if s.re_theta_inlet <= 0.0:
+            raise ValueError("kOmegaSSTLM needs solver.re_theta_inlet")
+        for name, inlet in (("ReThetat", s.re_theta_inlet), ("gammaInt", 1.0)):
+            fields[name] = _field("[0 0 0 0 0 0 0]", fmt(inlet), f"""    inlet
+    {{
+        type            fixedValue;
+        value           uniform {fmt(inlet)};
+    }}
+    "(nozzle|base)"
+    {{
+        type            zeroGradient;
+    }}
+    outlet
+    {{
+        type            zeroGradient;
+    }}
+    farfield
+    {{
+        type            zeroGradient;
+    }}
+""")
+    return fields
+
+
+_WALL_OUTPUT = """
+    // Wall heat flux, y+ and shear stress along the wall. The flux settles more
+    // slowly than the mass flow, and locally it does not settle: a resolved
+    // wall layer stays unsteady in the convergent section. So the heat-rate
+    // history is recorded every 100 iterations and the values along the wall
+    // every 500, for averaging. Fields are written at write times only.
+    wallHeatFlux
     {
-        type            compressible::alphatWallFunction;
-        value           uniform 0;
+        type            wallHeatFlux;
+        libs            (fieldFunctionObjects);
+        executeControl  timeStep;
+        executeInterval 100;
+        writeControl    writeTime;
+        log             false;
+        patches         (nozzle);
     }
-""")
-    return {"k": k, "omega": omega, "nut": nut, "alphat": alphat}
+    wallHeatRate
+    {
+        type            surfaceFieldValue;
+        libs            (fieldFunctionObjects);
+        writeControl    timeStep;
+        writeInterval   100;
+        log             false;
+        writeFields     false;
+        regionType      patch;
+        name            nozzle;
+        operation       areaIntegrate;
+        fields          (wallHeatFlux);
+    }
+    yPlus
+    {
+        type            yPlus;
+        libs            (fieldFunctionObjects);
+        executeControl  timeStep;
+        executeInterval 500;
+        writeControl    writeTime;
+        log             false;
+    }
+    wallShearStress
+    {
+        type            wallShearStress;
+        libs            (fieldFunctionObjects);
+        executeControl  timeStep;
+        executeInterval 500;
+        writeControl    writeTime;
+        log             false;
+        patches         (nozzle);
+    }
+    wallData
+    {
+        type            surfaces;
+        libs            (sampling);
+        writeControl    timeStep;
+        writeInterval   500;
+        surfaceFormat   raw;
+        interpolationScheme cell;
+        fields          (wallHeatFlux yPlus wallShearStress T p);
+        surfaces
+        {
+            wall
+            {
+                type        patch;
+                patches     (nozzle);
+                interpolate false;
+            }
+        }
+    }
+"""
 
 
 def _control_dict(c, s):
@@ -339,6 +502,7 @@ def _control_dict(c, s):
     exit_region, exit_name = (
         ("faceZone", "exit") if c.plume else ("patch", "outlet")
     )
+    wall_output = _WALL_OUTPUT if s.records_wall else ""
     return f"""application     rhoCentralFoam;
 
 startFrom       latestTime;
@@ -537,7 +701,7 @@ functions
         pRef            {fmt(c.p_amb)};
         CofR            (0 0 0);
     }}
-}}
+{wall_output}}}
 """
 
 
@@ -546,10 +710,14 @@ def _fv_schemes(s):
     # Limited schemes have a vector form (vanLeerV, MinmodV); upwind has not.
     lim_v = lim if lim in ("upwind", "linear") else f"{lim}V"
     turb = ""
-    if s.model == "kOmegaSST":
+    if s.model in RAS_MODELS:
         turb = """    div(phi,k)      Gauss upwind;
     div(phi,omega)  Gauss upwind;
     div(((rho*nuEff)*dev2(T(grad(U))))) Gauss linear;
+"""
+    if s.model == "kOmegaSSTLM":
+        turb += """    div(phi,ReThetat) Gauss upwind;
+    div(phi,gammaInt) Gauss upwind;
 """
     return f"""fluxScheme      Kurganov;
 
@@ -617,7 +785,7 @@ _FV_SOLUTION = """solvers
         relTol          0;
     }
 
-    "(k|omega)"
+    "(k|omega|ReThetat|gammaInt)"
     {
         solver          smoothSolver;
         smoother        GaussSeidel;
@@ -732,10 +900,10 @@ def write_case(case, conditions, solver):
     write(case, "constant/turbulenceProperties", "dictionary",
           _turbulence_properties(s.model))
     write(case, "0.orig/p", "volScalarField", _p(c))
-    write(case, "0.orig/T", "volScalarField", _T(c))
+    write(case, "0.orig/T", "volScalarField", _T(c, s))
     write(case, "0.orig/U", "volVectorField",
           _U(c, s.model, s.inlet_velocity_bc))
-    if s.model == "kOmegaSST":
+    if s.model in RAS_MODELS:
         for name, body in _turbulence_fields(c, s).items():
             write(case, f"0.orig/{name}", "volScalarField", body)
     write(case, "system/controlDict", "dictionary", _control_dict(c, s))

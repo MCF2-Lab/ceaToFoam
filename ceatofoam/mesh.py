@@ -25,7 +25,11 @@ axis and the wall; two further blocks hold the plume behind the exit plane.
 Resolution: ``radial_cells`` cells between the axis and the wall at every
 axial station, and axial cells of about ``cell_aspect`` times the local
 radial cell size, so the cell count follows the local radius and the throat
-is always resolved. ``scale`` multiplies every cell count (mesh studies). The
+is always resolved. ``scale`` multiplies every cell count (mesh studies).
+With ``first_cell_height`` > 0 (the wall cell at the throat; it scales with
+the radius and with 1/``scale``) the outer ``layer_fraction`` of the radius is
+graded towards the wall, from the core cell size, which stays uniform; the
+layer adds its own cells and the axial cells do not change. The
 cylindrical chamber is meshed only with ``include_cylinder``: in a steady
 frozen flow it is a duct at constant total conditions, and its low Mach
 number made the density-based solver converge slowly with spurious
@@ -49,6 +53,7 @@ from dataclasses import dataclass
 import math
 
 from .foamfile import fmt, write
+from .units import to_si
 
 
 @dataclass
@@ -61,6 +66,8 @@ class MeshSettings:
     plume_radius: float = 3.0     # exit radii
     growth: float = 1.05
     include_cylinder: bool = False   # mesh the cylindrical chamber too
+    first_cell_height: object = 0.0  # wall cell at the throat [m]; 0: uniform
+    layer_fraction: float = 0.25     # graded outer fraction of the radius
 
 
 def _geometric_cells(first, length, growth):
@@ -74,12 +81,44 @@ def _geometric_cells(first, length, growth):
     return n, growth**(n - 1)
 
 
+def wall_layer(rt, n_base, first, fraction):
+    """Radial cells of a layer graded from the core size to ``first`` at the
+    wall, at the throat radius ``rt``: (core cells, layer cells, growth)."""
+    thick = fraction*rt
+    n_core = max(4, round(n_base*(1 - fraction)))
+    core = (rt - thick)/n_core
+    if not first < core < thick:
+        raise ValueError(
+            f"first cell {first:g} m and core cell {core:g} m do not fit a"
+            f" layer of {thick:g} m"
+        )
+    growth = (thick - first)/(thick - core)
+    n_layer = max(2, round(1 + math.log(core/first)/math.log(growth)))
+    return n_core, n_layer, growth
+
+
 def block_mesh_dict(contour, settings):
     """Return (text of system/blockMeshDict, summary dict)."""
     s = settings
     alpha = math.radians(0.5*s.wedge_angle)
     ca, sa = math.cos(alpha), math.sin(alpha)
-    nr = max(4, round(s.radial_cells*s.scale))
+    nr_base = max(4, round(s.radial_cells*s.scale))
+    nr, radial_grading = nr_base, "1"
+    first = to_si(s.first_cell_height, "length")/s.scale
+    n_layer, growth = 0, 1.0
+    if first > 0.0:
+        if s.plume_length > 0.0:
+            raise ValueError("wall layers are not available with a plume")
+        n_core, n_layer, growth = wall_layer(
+            contour.rt, nr_base, first, s.layer_fraction
+        )
+        nr = n_core + n_layer
+        f = s.layer_fraction
+        core_size = (1 - f)*contour.rt/n_core
+        radial_grading = (
+            f"(({fmt(1 - f)} {fmt(n_core/nr)} 1)"
+            f" ({fmt(f)} {fmt(n_layer/nr)} {fmt(first/core_size)}))"
+        )
 
     stations = contour.stations           # 7 wall points (x, r)
     x_e, r_e = stations[-1]
@@ -99,19 +138,19 @@ def block_mesh_dict(contour, settings):
 
     blocks, edges = [], []
     n_axial = []
-    first = 0 if s.include_cylinder else 1
+    i_first = 0 if s.include_cylinder else 1
     for i, seg in enumerate(contour.segments):
-        if i < first:
+        if i < i_first:
             n_axial.append(0)
             continue
         r_mean = 0.5*(seg.start[1] + seg.end[1])
-        dx = s.cell_aspect*r_mean/nr
+        dx = s.cell_aspect*r_mean/nr_base
         n = max(2, math.ceil(seg.length/dx))
         n_axial.append(n)
         blocks.append(
             f"    hex ({axis[i]} {wm[i]} {wp[i]} {axis[i]} "
             f"{axis[i+1]} {wm[i+1]} {wp[i+1]} {axis[i+1]}) "
-            f"({nr} 1 {n}) simpleGrading (1 1 1)"
+            f"({nr} 1 {n}) simpleGrading ({radial_grading} 1 1)"
         )
         if seg.kind == "arc":
             xm, rm = seg.mid
@@ -121,13 +160,13 @@ def block_mesh_dict(contour, settings):
                     f"({fmt(xm)} {fmt(rm*ca)} {fmt(side*rm*sa)})"
                 )
 
-    used = range(first, 6)
+    used = range(i_first, 6)
     front = [f"({axis[i]} {wp[i]} {wp[i+1]} {axis[i+1]})" for i in used]
     back = [f"({axis[i]} {axis[i+1]} {wm[i+1]} {wm[i]})" for i in used]
     nozzle = [f"({wm[i]} {wp[i]} {wp[i+1]} {wm[i+1]})" for i in used]
     patches = [
         ("inlet", "patch",
-         [f"({axis[first]} {wp[first]} {wm[first]} {axis[first]})"]),
+         [f"({axis[i_first]} {wp[i_first]} {wm[i_first]} {axis[i_first]})"]),
         ("nozzle", "wall", nozzle),
     ]
     n_p = n_o = 0
@@ -205,10 +244,13 @@ boundary
         "plume_radial_cells": n_o,
         "cells": n_cells,
         "x_exit": x_e,
-        "x_inlet": stations[first][0],
+        "x_inlet": stations[i_first][0],
         "x_end": x_end,
         "r_far": r_far,
         "wedge_angle": s.wedge_angle,
+        "first_cell_height": first,
+        "layer_cells": n_layer,
+        "layer_growth": growth,
     }
     return text, summary
 

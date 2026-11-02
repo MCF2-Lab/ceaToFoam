@@ -18,8 +18,9 @@
 
 The package sizes a conical thrust chamber from a CEA chamber solution and
 writes an axisymmetric rhoCentralFoam case whose thermophysical model is the
-frozen chamber mixture. Sizing and CFD use the same frozen thermodynamics
-unless another sizing model is requested explicitly.
+frozen chamber mixture or, on request, a gas equivalent to the shifting-
+equilibrium or a kinetic expansion. Sizing and CFD use the same frozen
+thermodynamics unless another sizing or gas model is requested explicitly.
 """
 
-__version__ = "2.0.0"
+__version__ = "2.1.0.dev0"

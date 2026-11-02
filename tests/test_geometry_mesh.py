@@ -132,6 +132,22 @@ class TestWedge(unittest.TestCase):
     def test_check_mesh_plume(self):
         self._check(mesh.MeshSettings(plume_length=4.0, plume_radius=3.0))
 
+    @unittest.skipUnless(shutil.which("blockMesh") and shutil.which("checkMesh"),
+                         "OpenFOAM not sourced")
+    def test_check_mesh_wall_layer(self):
+        self._check(mesh.MeshSettings(first_cell_height=1e-5))
+
+    def test_wall_layer(self):
+        _, s = mesh.block_mesh_dict(
+            self.c, mesh.MeshSettings(first_cell_height=1e-5))
+        self.assertEqual(s["radial_cells"], 30 + s["layer_cells"])
+        # The axial cells do not change with the layer.
+        self.assertEqual(s["axial_cells"], self.summary["axial_cells"])
+        self.assertLess(s["layer_growth"], 1.3)
+        with self.assertRaises(ValueError):
+            mesh.block_mesh_dict(self.c, mesh.MeshSettings(
+                first_cell_height=1e-5, plume_length=4.0))
+
     def _check(self, settings):
         tut = os.path.join(os.environ["FOAM_TUTORIALS"], "compressible",
                            "rhoCentralFoam", "LadenburgJet60psi", "system")

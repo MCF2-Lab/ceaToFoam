@@ -70,6 +70,7 @@ class CeaPoint:
     gamma_c: float
     cp_c: float
     visc_c: float
+    prandtl_c: float = float("nan")
     composition: dict = field(default_factory=dict)
     #: CEA M,(1/n) at chamber, throat and exit (equal to the molecular
     #: weight without condensed species).
@@ -147,6 +148,7 @@ def run_rocket(
         gamma_c=out.c_gamma,
         cp_c=out.c_cp*1.0e3,
         visc_c=out.c_visc,
+        prandtl_c=out.c_pran,
         composition={k: v for k, v in out.prod_c.items() if v > 0.0},
         m_stations=(out.c_m, out.t_m, out.m),
         t_e=out.t,
