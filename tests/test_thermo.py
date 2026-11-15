@@ -136,6 +136,9 @@ class TestAgainstCEA(unittest.TestCase):
         self.assertAlmostEqual(d.mach_e/f.mach_e, 1, places=3)
         self.assertAlmostEqual(d.isp/f.isp, 1, places=3)
         self.assertAlmostEqual(d.cstar/f.cstar, 1, places=3)
+        # the velocity that CEA prints, not CEA_Wrap's seconds (g = 9.81)
+        self.assertAlmostEqual(d.ve/f.exit_velocity, 1, delta=2e-4)
+        self.assertAlmostEqual(f.isp*9.80665, f.ve, places=9)
 
 
 if __name__ == "__main__":

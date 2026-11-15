@@ -210,7 +210,7 @@ def size_frozen(thrust, pc, tc, p_amb, mixture):
 def size_equilibrium(thrust, p_amb, cea_point):
     """Sizing from a CEA shifting-equilibrium point at pip = pc/p_amb."""
     pt = cea_point
-    ve = pt.isp*G0
+    ve = pt.exit_velocity
     mdot = thrust/ve
     at = mdot*pt.cstar/pt.pc
     return Design(

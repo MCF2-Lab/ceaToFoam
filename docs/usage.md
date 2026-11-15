@@ -110,7 +110,8 @@ ceatofoam post .
 ```
 
 `post` averages the function-object output over the last quarter of the
-iterations (`--window`) and writes `results.json`. For the k-ω SST run of the
+iterations (`--window`), or over the second half of the final stage of a run
+that has one (`solver.final_iterations`), and writes `results.json`. For the k-ω SST run of the
 same engine at 2250 lbf it contains, among others:
 
 ```json
@@ -140,8 +141,10 @@ same engine at 2250 lbf it contains, among others:
 | `mdot_balance` | relative difference of the exit and inlet mass flow rates; judge convergence by it (accept within 0.5 %) |
 | `thrust_exit` | thrust from the exit-plane momentum and pressure integrals [N] |
 | `thrust_wall_budget` | the same thrust from the inlet fluxes and the wall force; `momentum_closure` is the relative difference |
-| `pe_mean`, `te_mean`, `mach_e_mean` | area-averaged exit pressure, temperature and Mach number |
+| `pe_mean`, `te_mean`, `mach_e_mean` | area-averaged exit pressure, temperature and Mach number, means over the averaging window |
 | `iterative_std_*` | relative standard deviation over the averaging window |
+| `mdot_inlet_drift` | relative change of the inlet mass flow over the last quarter of the first stage (its last tenth against the tenth that ends at three quarters); a settled solution shows none |
+| `iterative_sem_*` | relative standard error of the window mean, from the means of five blocks of the window |
 | `discharge_coefficient` | \(\dot m / \dot m_{1D}\), the one-dimensional frozen mass flow through the throat area of the contour |
 | `t_min_window`, `t_max_window`, `janaf_t_low` | temperature extremes of the window and the lower limit of the janaf fit |
 | `design` | the design point the case was sized for |

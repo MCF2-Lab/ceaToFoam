@@ -87,5 +87,30 @@ class TestConstantGamma(unittest.TestCase):
         self.assertAlmostEqual(d.mach_e/2.781606421750013, 1, places=5)
 
 
+class TestFinalStage(unittest.TestCase):
+    """Final stage at a lower Courant number: run script and averaging
+    window (no solver needed)."""
+
+    def test_allrun_continues_at_final_courant_number(self):
+        from ceatofoam.foamcase import SolverSettings, _allrun
+        plain = _allrun(SolverSettings(iterations=400))
+        self.assertNotIn("foamDictionary", plain)
+        staged = _allrun(SolverSettings(iterations=400, final_iterations=100,
+                                        final_max_co=0.1))
+        self.assertIn("-entry maxCo -set 0.1 system/controlDict", staged)
+        self.assertIn("-entry endTime -set 500 system/controlDict", staged)
+        self.assertEqual(staged.count("-append $(getApplication)"), 2)
+
+    def test_window_is_second_half_of_final_stage(self):
+        from ceatofoam.post import window_start
+        self.assertAlmostEqual(
+            window_start({"solver": {"final_iterations": 0}}, 40000, 0.25),
+            30000)
+        self.assertAlmostEqual(window_start({}, 40000, 0.25), 30000)
+        self.assertAlmostEqual(
+            window_start({"solver": {"final_iterations": 10000}}, 50000,
+                         0.25), 45000)
+
+
 if __name__ == "__main__":
     unittest.main()

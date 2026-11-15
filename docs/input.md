@@ -54,6 +54,8 @@ solver:
   iterations: 20000
   write_interval: 2000
   max_co: 0.2
+  final_iterations: 0                # final stage at final_max_co; 0: none
+  final_max_co: 0.1
   lts_smoothing: 0.02                # above the layer growth with a wall layer
   n_procs: 1
   wall_treatment: wall-function      # wall-function | resolved
@@ -182,6 +184,8 @@ same resolution for a 500 lbf engine and for a 1.5 Mlbf engine.
 | `iterations` | `20000` | iterations of local time stepping (one time unit each) |
 | `write_interval` | `2000` | iterations between written fields |
 | `max_co` | `0.2` | Courant number of the local time step |
+| `final_iterations` | `0` | iterations of a final stage at the Courant number `final_max_co`; 0: no final stage |
+| `final_max_co` | `0.1` | Courant number of the final stage |
 | `limiter` | `vanLeer` | limiter of the reconstruction of \(\rho\), \(U\) and \(T\) |
 | `lts_smoothing` | `0.02` | `rDeltaTSmoothingCoeff` |
 | `turbulence_intensity` | `0.05` | at the inlet |

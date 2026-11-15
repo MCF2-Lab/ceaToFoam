@@ -31,6 +31,11 @@ from dataclasses import dataclass, field
 
 from .units import G0
 
+#: CEA prints the specific impulse as a velocity [m/s]. CEA_Wrap (2.1.2,
+#: wrapper.py) divides it by this value to give seconds, which is not the
+#: standard gravity G0; the velocity of CEA is recovered with the same value.
+CEA_WRAP_G = 9.81
+
 #: Default propellant inlet temperatures [K]. For the cryogenic and
 #: fixed-temperature condensed species these are the reference temperatures
 #: of the species in the CEA thermodynamic library (thermo.inp, McBride
@@ -57,7 +62,9 @@ class CeaPoint:
     """Chamber state and one-dimensional performance of one CEA run.
 
     Pressures in Pa, temperatures in K, velocities in m/s, Isp in s,
-    molecular weight in kg/kmol, viscosity in Pa s.
+    molecular weight in kg/kmol, viscosity in Pa s. ``ve`` and ``ve_vac`` are
+    the velocities that CEA prints as Isp and Ivac; ``isp`` and ``ivac`` are
+    these divided by the standard gravity.
     """
 
     analysis: str
@@ -82,11 +89,13 @@ class CeaPoint:
     ivac: float = float("nan")
     cstar: float = float("nan")
     area_ratio: float = float("nan")
+    ve: float = float("nan")
+    ve_vac: float = float("nan")
 
     @property
     def exit_velocity(self):
         """Exit velocity [m/s]; Isp of CEA is the ideal (matched) value."""
-        return self.isp*G0
+        return self.ve
 
 
 def _materials(fuel, oxidizer, t_fuel=None, t_oxidizer=None):
@@ -154,10 +163,12 @@ def run_rocket(
         t_e=out.t,
         p_e=out.p*1.0e5,
         mach_e=out.mach,
-        isp=out.isp,
-        ivac=out.ivac,
+        isp=out.isp*CEA_WRAP_G/G0,
+        ivac=out.ivac*CEA_WRAP_G/G0,
         cstar=out.cstar,
         area_ratio=out.ae if out.ae > 0.0 else float("nan"),
+        ve=out.isp*CEA_WRAP_G,
+        ve_vac=out.ivac*CEA_WRAP_G,
     )
 
 

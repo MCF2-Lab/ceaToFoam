@@ -56,6 +56,12 @@ class SolverSettings:
     iterations: int = 20000
     write_interval: int = 2000
     max_co: float = 0.2
+    # Final stage: final_iterations more at the Courant number final_max_co.
+    # At max_co the explicit scheme keeps a fluctuation of the supersonic
+    # flow (largest on a wall-layer mesh) that a lower Courant number damps;
+    # results are then averaged over the second half of this stage.
+    final_iterations: int = 0
+    final_max_co: float = 0.1
     limiter: str = "vanLeer"      # reconstruct() limiter for rho, U, T
     lts_smoothing: float = 0.02   # rDeltaTSmoothingCoeff (solver default)
     turbulence_intensity: float = 0.05
@@ -879,11 +885,29 @@ if [ "$(getNumberOfProcessors)" -gt 1 ]
 then
     runApplication decomposePar
     runParallel $(getApplication)
-    runApplication reconstructPar -latestTime
+@FINAL_PARALLEL@    runApplication reconstructPar -latestTime
 else
     runApplication $(getApplication)
-fi
+@FINAL_SERIAL@fi
 """
+
+# Final stage: the same solver continued at a lower Courant number.
+_FINAL_STAGE = """\
+    foamDictionary -entry maxCo -set {max_co} system/controlDict > /dev/null
+    foamDictionary -entry endTime -set {end} system/controlDict > /dev/null
+    {run} -append $(getApplication)
+"""
+
+
+def _allrun(s):
+    def stage(run):
+        if not s.final_iterations:
+            return ""
+        return _FINAL_STAGE.format(max_co=fmt(s.final_max_co),
+                                   end=s.iterations + s.final_iterations,
+                                   run=run)
+    return (_ALLRUN.replace("@FINAL_PARALLEL@", stage("runParallel"))
+            .replace("@FINAL_SERIAL@", stage("runApplication")))
 
 _ALLCLEAN = """#!/bin/sh
 cd "${0%/*}" || exit 1
@@ -913,7 +937,7 @@ def write_case(case, conditions, solver):
     write(case, "system/setFieldsDict", "dictionary", _set_fields(c))
     write(case, "system/decomposeParDict", "dictionary",
           _decompose(s.n_procs))
-    for name, text in (("Allrun", _ALLRUN), ("Allclean", _ALLCLEAN)):
+    for name, text in (("Allrun", _allrun(s)), ("Allclean", _ALLCLEAN)):
         path = os.path.join(case, name)
         with open(path, "w") as f:
             f.write(text)

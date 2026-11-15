@@ -28,9 +28,13 @@ Thrust is evaluated in two ways:
 
 Both are equal if axial momentum is conserved, so their difference measures
 the momentum budget closure of the discretization. Results are means over
-the last ``window`` fraction of the iterations; their relative range
-(steadiness) and relative standard deviation (iterative uncertainty) are
-reported with them.
+the last ``window`` fraction of the iterations, or over the second half of
+the final stage of a run that ends with one (solver.final_iterations); their
+relative range (steadiness) and relative standard deviation (iterative
+uncertainty) are reported with them. A solution that keeps fluctuating about a constant mean
+has a well-defined mean all the same: its relative standard error is
+estimated from the means of ``BLOCKS`` consecutive blocks of the window
+(iterative_sem_*).
 """
 
 import json
@@ -40,6 +44,24 @@ import os
 import numpy as np
 
 from .units import G0
+
+BLOCKS = 5      # blocks of the averaging window for the error of the mean
+
+
+def _record(case):
+    with open(os.path.join(case, "ceatofoam.json")) as f:
+        return json.load(f)
+
+
+def window_start(rec, end, window):
+    """First iteration of the averaging window of a run of ``end``
+    iterations: the last ``window`` fraction of them, or the second half of
+    the final stage (the first half is left to the change of the Courant
+    number)."""
+    final = rec.get("solver", {}).get("final_iterations", 0)
+    if final:
+        return end - 0.5*final
+    return end*(1 - window)
 
 
 def _read_dat(path):
@@ -104,7 +126,7 @@ def _heat_rate(case, window):
         h = _series(case, "wallHeatRate")
     except FileNotFoundError:
         return {}
-    sel = h[:, 0] >= h[-1, 0]*(1 - window)
+    sel = h[:, 0] >= window_start(_record(case), h[-1, 0], window)
     mean = float(np.mean(h[sel, 1]))
     if mean == 0.0:             # adiabatic wall
         return {}
@@ -117,8 +139,7 @@ def _heat_rate(case, window):
 
 
 def evaluate(case, window=0.25):
-    with open(os.path.join(case, "ceatofoam.json")) as f:
-        rec = json.load(f)
+    rec = _record(case)
     p_amb = rec["ambient"]["p"]
     rc, re = rec["geometry"]["rc"], rec["geometry"]["re"]
 
@@ -147,7 +168,8 @@ def evaluate(case, window=0.25):
     f_wall[:m] = force[:m, 1]*k_e[:m]   # total force, x component
     f_budget = f_inlet - f_wall
 
-    last = it >= it[-1]*(1 - window)
+    start = window_start(rec, it[-1], window)
+    last = it >= start
 
     def stat(a):
         """Mean, relative range and relative standard deviation."""
@@ -156,17 +178,43 @@ def evaluate(case, window=0.25):
         return (mean, float((np.max(a) - np.min(a))/abs(mean)),
                 float(np.std(a)/abs(mean)))
 
+    def sem(a):
+        """Relative standard error of the window mean from block means."""
+        blocks = np.array_split(a[last], BLOCKS)
+        if min(len(b) for b in blocks) < 2:
+            return float("nan")
+        means = np.array([np.mean(b) for b in blocks])
+        return float(np.std(means, ddof=1)/math.sqrt(BLOCKS)
+                     / abs(np.mean(a[last])))
+
     mdot, mdot_var, mdot_std = stat(mdot_e)
     thrust, thrust_var, thrust_std = stat(f_exit)
     mdot_in, _, _ = stat(mdot_i)
     budget, _, _ = stat(f_budget)
-    j = min(len(avg_e), n) - 1
+    # Drift of the inlet mass flow over the last quarter of the first stage
+    # (of the whole run without a final stage): the mean over its last tenth
+    # against the mean over the tenth that ends at three quarters. A settled
+    # solution shows none; the scatter of the window does not see a slow,
+    # steady change.
+    first = float(rec.get("solver", {}).get("iterations") or it[-1])
+    first = min(first, it[-1])
+
+    def tenth(end):
+        return np.mean(mdot_i[(it > end - 0.1*first) & (it <= end)])
+
+    mdot_drift = float(tenth(first)/tenth(0.75*first) - 1)
+    # Exit-plane averages over the same window (not the last sample: the
+    # exit plane fluctuates more than the integrals).
+    sel_e = avg_e[:, 0] >= start
+    pe_mean, te_mean, mach_e_mean = (float(np.mean(avg_e[sel_e, c]))
+                                     for c in (1, 2, 3))
+    pe_std = float(np.std(avg_e[sel_e, 1])/abs(pe_mean))
     design = rec["design"]
     # Extremes of T in the averaging window: start-up transients may touch
     # the janaf limits (clipped by OpenFOAM); the converged state must not.
     try:
         mm = _read_minmax_T(case)
-        sel = mm[:, 0] >= mm[-1, 0]*(1 - window)
+        sel = mm[:, 0] >= start
         t_min_window = float(mm[sel, 1].min())
         t_max_window = float(mm[sel, 2].max())
     except (FileNotFoundError, IndexError, ValueError):
@@ -175,7 +223,7 @@ def evaluate(case, window=0.25):
         thr = _series(case, "throatFlux")   # Time, area, areaNormalIntegrate
         rt = rec["geometry"]["rt"]
         mdot_t = thr[:, 2]*math.pi*rt**2/thr[:, 1]
-        sel = thr[:, 0] >= thr[-1, 0]*(1 - window)
+        sel = thr[:, 0] >= start
         mdot_throat = float(np.mean(mdot_t[sel]))
     except FileNotFoundError:
         mdot_throat = float("nan")
@@ -190,14 +238,20 @@ def evaluate(case, window=0.25):
         "thrust_wall_budget": budget,
         "momentum_closure": (budget - thrust)/thrust,
         "isp": thrust/(mdot*G0),
-        "pe_mean": float(avg_e[j, 1]),
-        "te_mean": float(avg_e[j, 2]),
-        "mach_e_mean": float(avg_e[j, 3]),
+        "pe_mean": pe_mean,
+        "te_mean": te_mean,
+        "mach_e_mean": mach_e_mean,
         "steadiness_mdot": mdot_var,
         "steadiness_thrust": thrust_var,
-        # Iterative uncertainty: relative standard deviation in the window.
+        # Iterative uncertainty: relative standard deviation in the window,
+        # and relative standard error of the window mean (block means).
         "iterative_std_mdot": mdot_std,
         "iterative_std_thrust": thrust_std,
+        "iterative_std_pe": pe_std,
+        "iterative_sem_mdot": sem(mdot_e),
+        "iterative_sem_thrust": sem(f_exit),
+        "iterative_sem_mdot_inlet": sem(mdot_i),
+        "mdot_inlet_drift": mdot_drift,
         # Injector-face mass flow: it settles first; equal to the exit and
         # throat values once mdot_balance is small.
         "discharge_coefficient": mdot_in/rec["mdot_ideal"],
@@ -262,7 +316,7 @@ def _raw_surface(path):
 
 
 def wall_data(case, window=0.25):
-    """Wall values averaged over the last ``window`` of the iterations, one
+    """Wall values averaged over the window (window_start), one
     row per wall face, sorted by x: dict of arrays x, q (heat flux from the
     gas into the wall [W/m2]), q_std (its standard deviation over the
     window), yplus, tau (shear stress magnitude [Pa]), T, p. Local values of
@@ -272,8 +326,9 @@ def wall_data(case, window=0.25):
     if not os.path.isdir(base):
         return {}
     times = sorted(os.listdir(base), key=float)
+    start = window_start(_record(case), float(times[-1]), window)
     times = [t for t in times
-             if float(t) >= float(times[-1])*(1 - window)
+             if float(t) >= start
              and os.path.exists(os.path.join(base, t, "yPlus_wall.raw"))]
     if not times:
         return {}
