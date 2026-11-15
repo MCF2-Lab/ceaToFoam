@@ -5,17 +5,18 @@ release is archived on Zenodo with its own DOI:
 
 | Citing | DOI |
 | --- | --- |
+| ceaToFoam 2.1.1 | [10.5281/zenodo.24263668](https://doi.org/10.5281/zenodo.24263668) |
 | ceaToFoam 2.0.0 | [10.5281/zenodo.23637115](https://doi.org/10.5281/zenodo.23637115) |
 | All versions (resolves to the latest) | [10.5281/zenodo.23637114](https://doi.org/10.5281/zenodo.23637114) |
 
 ```bibtex
-@software{ceatofoam_2_0_0,
+@software{ceatofoam_2_1_1,
   author    = {Cerda, Luke and Madadi-Kandjani, Ehsan},
   title     = {ceaToFoam: NASA CEA chamber thermochemistry to OpenFOAM rocket-nozzle cases},
-  version   = {2.0.0},
+  version   = {2.1.1},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23637115},
+  doi       = {10.5281/zenodo.24263668},
   url       = {https://github.com/MCF2-Lab/ceaToFoam},
   license   = {GPL-3.0-only}
 }

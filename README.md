@@ -135,8 +135,8 @@ contour is conical. Injectors, combustion and wall cooling are not modelled.
 If you use ceaToFoam, please cite it; GitHub's "Cite this repository" button
 reads [CITATION.cff](CITATION.cff). Every release is archived on Zenodo:
 [10.5281/zenodo.23637114](https://doi.org/10.5281/zenodo.23637114) cites all
-versions, and [10.5281/zenodo.23637115](https://doi.org/10.5281/zenodo.23637115)
-cites version 2.0.0. The method, its verification and its
+versions, and [10.5281/zenodo.24263668](https://doi.org/10.5281/zenodo.24263668)
+cites version 2.1.1. The method, its verification and its
 validation are described in L. Cerda and E. Madadi-Kandjani, *Consistent
 thermochemistry for frozen-flow simulations of liquid-rocket thrust chambers:
 sizing, verification and validation*; the full reference will be added once

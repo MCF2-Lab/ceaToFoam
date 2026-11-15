@@ -25,8 +25,8 @@ identifiers:
     value: 10.5281/zenodo.23637114
     description: All versions of ceaToFoam (resolves to the latest release)
   - type: doi
-    value: 10.5281/zenodo.23637115
-    description: ceaToFoam 2.0.0
+    value: 10.5281/zenodo.24263668
+    description: ceaToFoam 2.1.1
 repository-code: "https://github.com/MCF2-Lab/ceaToFoam"
 url: "https://mcf2-lab.github.io/ceaToFoam/"
 keywords:
