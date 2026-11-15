@@ -23,4 +23,4 @@ equilibrium or a kinetic expansion. Sizing and CFD use the same frozen
 thermodynamics unless another sizing or gas model is requested explicitly.
 """
 
-__version__ = "2.1.0.dev0"
+__version__ = "2.1.1"
